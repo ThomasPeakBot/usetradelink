@@ -34,3 +34,5 @@ jobs:
           assert not any(x in text for x in forbidden)
           print('No GitHub publishing API found')
           PY
+      - name: Live site crawl (read-only; no database writes)
+        run: python main.py --dry-run

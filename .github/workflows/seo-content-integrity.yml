@@ -1,20 +1,6 @@
 name: TradeLink SEO content integrity
 on:
   pull_request:
-    paths:
-      - 'resources/**'
-      - 'compare/**'
-      - 'blog/**'
-      - 'blogs/**'
-      - 'guides/**'
-      - 'tradovate-*/**'
-      - 'futures-*/**'
-      - 'cloud-futures-*/**'
-      - 'prop-firm-*/**'
-      - 'apex-*/**'
-      - 'best-futures-*/**'
-      - 'sitemap.xml'
-      - 'llms.txt'
   workflow_dispatch:
 jobs:
   seo-content-integrity:

@@ -565,8 +565,8 @@ def opportunities(authorization: str | None = Header(None)):
                 ORDER BY impressions DESC LIMIT 100
             """)
             rows = cur.fetchall()
-            cur.execute("SELECT to_regclass('public.seo_semrush_keyword_metrics') IS NOT NULL")
-            metrics_available = bool(cur.fetchone()["?column?"])
+            cur.execute("SELECT to_regclass('public.seo_semrush_keyword_metrics') IS NOT NULL AS available")
+            metrics_available = bool(cur.fetchone()["available"])
             latest = {}
             if metrics_available:
                 cur.execute("""

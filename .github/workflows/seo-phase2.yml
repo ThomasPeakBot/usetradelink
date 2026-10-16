@@ -1,0 +1,30 @@
+name: TradeLink SEO Phase 2 approval tests
+on:
+  pull_request:
+    paths:
+      - 'automation/approvals/**'
+      - '.github/workflows/seo-phase2.yml'
+  workflow_dispatch:
+jobs:
+  approval-gateway-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: automation/approvals
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - run: python -m py_compile app.py
+      - run: python -m unittest discover -s tests -v
+      - name: Ensure publication is fail-closed
+        run: |
+          python - <<'PY'
+          from app import armed
+          assert armed() is False, "Without secrets there must be no publishing"
+          print("Publishing off by default")
+          PY

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "deny": [
+      "mcp__Semrush__execute_report"
+    ]
+  }
+}

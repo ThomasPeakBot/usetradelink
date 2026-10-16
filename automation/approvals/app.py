@@ -553,16 +553,44 @@ def opportunities(authorization: str | None = Header(None)):
     require_internal(authorization)
     with connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""SELECT page,query,SUM(impressions)::int AS impressions,
-                         SUM(clicks)::int AS clicks,
-                         ROUND((SUM(position * impressions) /
-                               NULLIF(SUM(impressions),0))::numeric,1) AS position
-                         FROM seo_search_performance
-                         WHERE data_date >= current_date-35
-                         GROUP BY page,query
-                         HAVING SUM(impressions)>=20
-                         ORDER BY impressions DESC LIMIT 100""")
+            cur.execute("""
+                SELECT page,query,SUM(impressions)::int AS impressions,
+                       SUM(clicks)::int AS clicks,
+                       ROUND((SUM(position * impressions) /
+                             NULLIF(SUM(impressions),0))::numeric,1) AS position
+                FROM seo_search_performance
+                WHERE data_date >= current_date-35
+                GROUP BY page,query
+                HAVING SUM(impressions)>=20
+                ORDER BY impressions DESC LIMIT 100
+            """)
             rows = cur.fetchall()
-    candidates = [r for r in rows if 4 <= float(r["position"] or 0) <= 25]
-    return {"source": "gsc", "candidates": candidates[:30],
-            "note": "Research candidates only: no drafts or site changes are published."}
+            cur.execute("SELECT to_regclass('public.seo_semrush_keyword_metrics') IS NOT NULL")
+            metrics_available = bool(cur.fetchone()["?column?"])
+            latest = {}
+            if metrics_available:
+                cur.execute("""
+                    SELECT DISTINCT ON (keyword) keyword,search_volume,
+                        keyword_difficulty,cpc_usd,intents,collected_on
+                    FROM seo_semrush_keyword_metrics
+                    WHERE country='US'
+                    ORDER BY keyword,collected_on DESC
+                """)
+                latest = {r["keyword"]: r for r in cur.fetchall()}
+    candidates = []
+    for row in rows:
+        if not 4 <= float(row["position"] or 0) <= 25:
+            continue
+        term = row["query"].strip().lower()
+        m = latest.get(term)
+        item = dict(row)
+        item["semrush"] = (
+            {"search_volume": m["search_volume"],
+             "keyword_difficulty": float(m["keyword_difficulty"]) if m["keyword_difficulty"] is not None else None,
+             "cpc_usd": float(m["cpc_usd"]) if m["cpc_usd"] is not None else None,
+             "intents": m["intents"], "collected_on": m["collected_on"].isoformat()}
+            if m else None)
+        candidates.append(item)
+    return {"source": "gsc+semrush" if latest else "gsc",
+            "candidates": candidates[:30],
+            "note": "Research candidates only; Semrush is optional and budget-controlled. No drafts or site changes are published."}

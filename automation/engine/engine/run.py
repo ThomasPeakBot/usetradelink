@@ -81,8 +81,9 @@ def save_opportunities(conn, run_id, items):
                              (uuid.uuid4(), o["fingerprint"], run_id, o["action"], o["content_type"], o["target_url"],
                               o["head_keyword"], o["keywords"], o["priority"], json.dumps(score, default=str),
                               json.dumps(o["evidence"], default=str), o["rationale"]))
-        conn.execute("UPDATE seo_opportunities SET status='superseded' WHERE status='open' AND NOT (fingerprint = ANY(%s))",
-                     (seen,))
+        # A brief is only a plan, so it lapses with its evidence; drafted/proposed work has a PR to resolve.
+        conn.execute("UPDATE seo_opportunities SET status='superseded' WHERE status IN ('open','briefed') "
+                     "AND NOT (fingerprint = ANY(%s))", (seen,))
     counts = {}
     for o in items:
         counts[o["action"]] = counts.get(o["action"], 0) + 1

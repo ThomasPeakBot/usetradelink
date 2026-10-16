@@ -153,6 +153,24 @@ class EngineDatabaseTests(unittest.TestCase):
         self.assertEqual(self.conn.execute("SELECT status FROM engine_runs ORDER BY started_at DESC LIMIT 1")
                          .fetchone()["status"], "complete")
 
+    def test_briefed_opportunity_lapses_when_evidence_is_gone(self):
+        run_id = uuid.uuid4()
+        self.conn.execute("INSERT INTO engine_runs(id) VALUES(%s)", (run_id,))
+        item = {"fingerprint": "f-topstep", "action": "improve_page", "content_type": None,
+                "target_url": "https://usetradelink.com/prop-firm-copy-trading/",
+                "head_keyword": "how to copy trade on topstep", "keywords": ["how to copy trade on topstep"],
+                "priority": 16.2, "score": {}, "evidence": [], "rationale": "no heading answers it"}
+        run.save_opportunities(self.conn, run_id, [item])
+        self.conn.execute("UPDATE seo_opportunities SET status='briefed'")
+        run.save_opportunities(self.conn, run_id, [item])  # still supported: kept
+        self.assertEqual(self.count("SELECT count(*) AS n FROM seo_opportunities WHERE status='briefed'"), 1)
+        run.save_opportunities(self.conn, run_id, [])  # the page now answers it
+        self.assertEqual(self.count("SELECT count(*) AS n FROM seo_opportunities WHERE status='superseded'"), 1)
+        self.conn.execute("UPDATE seo_opportunities SET status='proposed'")
+        run.save_opportunities(self.conn, run_id, [])  # a PR exists: resolved by the PR, not here
+        self.assertEqual(self.count("SELECT count(*) AS n FROM seo_opportunities WHERE status='proposed'"), 1)
+        self.conn.commit()
+
     def test_failing_step_is_recorded_and_run_marked_failed(self):
         with patch("engine.research.run_semrush", side_effect=RuntimeError("boom secret-key")):
             r, status = run.cycle(self.conn, site_dir=REPO)

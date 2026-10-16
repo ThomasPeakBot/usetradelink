@@ -86,3 +86,14 @@ At construction time no Slack app credentials, GitHub publishing token, or Slack
 - Slack callback: https://seo-approvals-production.up.railway.app/slack/interactions
 - Health: https://seo-approvals-production.up.railway.app/health
 - App manifest: https://github.com/ThomasPeakBot/usetradelink/blob/seo/phase2-slack-approvals-20261016/automation/approvals/slack-app-manifest.yaml
+
+## Railway deployment source (required before arming)
+Railway services currently build from development branches. Code cannot change a Railway service's connected branch, so the service enforces it at runtime instead:
+- `armed()` is false unless `RAILWAY_GIT_BRANCH` (set by Railway) is in `PUBLISH_ALLOWED_BRANCHES` (default `main`). A deploy from `seo/phase2-...` or any feature branch can never publish, whatever its variables say.
+- `/health` reports `deployed_branch`, `deployed_commit` and `deployed_from_allowed_branch`, so the running SHA can be compared with the reviewed one.
+- `railway.json` sets `watchPatterns` to `/automation/approvals/**`, so website or other service changes do not redeploy this token-bearing service.
+
+Operator steps (Railway dashboard → service → Settings → Source):
+1. After the reviewed PRs merge, change the connected branch of `seo-approvals` and `seo-auditor` from the development branches to `main`.
+2. Turn on **Wait for CI** so a deploy only happens after GitHub checks pass.
+3. Until then, keep `PUBLISHING_ENABLED=false` and do not give the service a GitHub token with merge rights.

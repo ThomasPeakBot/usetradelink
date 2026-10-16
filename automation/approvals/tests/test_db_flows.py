@@ -15,7 +15,8 @@ import app as gateway
 DB = os.getenv("TEST_DATABASE_URL", "")
 ENV = {"DATABASE_URL": DB, "PUBLISHING_ENABLED": "true", "BRANCH_PROTECTION_VERIFIED": "true",
        "GITHUB_TOKEN": "t", "SLACK_BOT_TOKEN": "b", "SLACK_SIGNING_SECRET": "s",
-       "SLACK_APPROVER_IDS": "U1", "SLACK_TEAM_ID": "T1", "SLACK_CHANNEL_ID": "C1"}
+       "SLACK_APPROVER_IDS": "U1", "SLACK_TEAM_ID": "T1", "SLACK_CHANNEL_ID": "C1",
+       "RAILWAY_GIT_BRANCH": "main"}
 SHA1, SHA2 = "1" * 40, "2" * 40
 
 

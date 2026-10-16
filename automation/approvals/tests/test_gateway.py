@@ -17,7 +17,7 @@ SECRET = "test-signing-secret"
 ARMED_ENV = {"PUBLISHING_ENABLED": "true", "BRANCH_PROTECTION_VERIFIED": "true",
              "GITHUB_TOKEN": "t", "SLACK_BOT_TOKEN": "b", "SLACK_SIGNING_SECRET": SECRET,
              "SLACK_APPROVER_IDS": "U1", "SLACK_TEAM_ID": "T1", "SLACK_CHANNEL_ID": "C1",
-             "DATABASE_URL": "postgresql://unused"}
+             "DATABASE_URL": "postgresql://unused", "RAILWAY_GIT_BRANCH": "main"}
 PID = "6f1c1d0e-8a7b-4c55-9a43-2f3a1e5b7c90"
 
 
@@ -99,6 +99,15 @@ class PublishGateTests(unittest.TestCase):
     @patch.dict(os.environ, dict(ARMED_ENV, SLACK_CHANNEL_ID=""), clear=True)
     def test_missing_channel_disarms(self):
         self.assertFalse(armed())
+
+    @patch.dict(os.environ, ARMED_ENV, clear=True)
+    def test_development_branch_deploy_never_arms(self):
+        self.assertTrue(armed())
+        for branch in ("seo/phase2-slack-approvals-20261016", ""):
+            with patch.dict(os.environ, {"RAILWAY_GIT_BRANCH": branch}):
+                self.assertFalse(armed())
+        with patch.dict(os.environ, {"RAILWAY_GIT_BRANCH": "release", "PUBLISH_ALLOWED_BRANCHES": "release"}):
+            self.assertTrue(armed())
 
     @patch("app.branch_protection_ok", return_value=True)
     @patch("app.armed", return_value=True)

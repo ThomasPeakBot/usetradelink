@@ -71,9 +71,15 @@ CREATE TABLE IF NOT EXISTS seo_slack_deliveries (
 def configured(name):
     return bool(os.getenv(name, "").strip())
 
+def deployed_from_allowed_branch():
+    """Railway sets RAILWAY_GIT_BRANCH. A service built from a development branch never publishes."""
+    allowed = {b.strip() for b in os.getenv("PUBLISH_ALLOWED_BRANCHES", "main").split(",") if b.strip()}
+    return os.getenv("RAILWAY_GIT_BRANCH", "") in allowed
+
 def armed():
     """Configuration gate only. GitHub-side protection is verified separately at execution."""
     return (os.getenv("PUBLISHING_ENABLED", "").lower() == "true"
+            and deployed_from_allowed_branch()
             and os.getenv("BRANCH_PROTECTION_VERIFIED", "").lower() == "true"
             and all(configured(x) for x in
                     ("GITHUB_TOKEN", "SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET",
@@ -334,6 +340,10 @@ def health():
                 ("SLACK_SIGNING_SECRET", "SLACK_BOT_TOKEN", "SLACK_CHANNEL_ID",
                  "SLACK_TEAM_ID", "SLACK_APPROVER_IDS")),
             "github_token_configured": configured("GITHUB_TOKEN"),
+            # Non-secret deploy provenance so operators can compare against reviewed SHAs.
+            "deployed_branch": os.getenv("RAILWAY_GIT_BRANCH", ""),
+            "deployed_commit": os.getenv("RAILWAY_GIT_COMMIT_SHA", "")[:12],
+            "deployed_from_allowed_branch": deployed_from_allowed_branch(),
             "publishing_armed": armed()}
 
 def post_proposal(proposal_id, number, sha, title, summary):

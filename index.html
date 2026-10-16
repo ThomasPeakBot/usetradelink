@@ -179,6 +179,14 @@ twq('config','ojfhb');
 <div class="progress-copy announcement-copy"><b>TRADELINK IS LIVE</b> · <b>$40/month</b></div>
 <div class="header-actions">
 <!--<a class="btn btn-secondary header-signin" href="https://accounts.peakbot.com/login?response_type=code&client_id=peakbot-tradelink&state=AM9or3j84aIvGvg8SSMYpdpwNXFH-onG&scope=openid+profile+email&redirect_uri=https%3A%2F%2Ftradelink.peakbot.com%2Fapi%2Fauth%2Foauth2%2Fcallback%2Fpeakbot&code_challenge_method=S256&code_challenge=mV-d2SraCGEUCSqtaZTxAFEnuZzmJpwI2Ih-K7BcAis">Sign In</a>-->
+<details class="header-resources">
+<summary class="btn btn-secondary header-resources-toggle">Resources</summary>
+<nav class="header-resources-menu" aria-label="Resources">
+<a href="/compare/tradelink-vs-tradesyncer/">TradeLink vs TradeSyncer</a>
+<a href="/tradovate-trade-copier/">Tradovate trade copier</a>
+<a href="/futures-trade-copier/">What is a futures trade copier?</a>
+</nav>
+</details>
 <a class="btn btn-primary header-claim" href="https://tlink.peakbot.com/checkout/price_1UDhh0BZsQfGLBPdlnScmYrH">Start TradeLink</a>
 </div>
 </div>
@@ -414,5 +422,10 @@ Users remain solely responsible for monitoring their accounts, positions, orders
 </div>
 </div></div>
 <script src="main.js"></script>
+<script>
+(function(){var d=document.querySelector('.header-resources');if(!d)return;
+document.addEventListener('click',function(e){if(d.open&&!d.contains(e.target))d.open=false;});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&d.open){d.open=false;d.querySelector('summary').focus();}});})();
+</script>
 </body>
 </html>

@@ -26,28 +26,34 @@ The Phase 1 \`seo-auditor\` remains a separate, read-only Railway cron service.
 - Hard requirement: enable GitHub branch protection on \`main\` before turning on publishing. Require pull requests and successful \`seo-content-integrity\`; limit bypass and direct pushes.
 - Do not create any Slack approval workflow with an unrestricted repository credential. Prefer a dedicated GitHub App installation token with only repo Content/Pull requests writes.
 
-## Slack app setup (done by workspace administrator)
-1. Create an app **from scratch** at https://api.slack.com/apps, e.g. \`TradeLink SEO Agent\`.
-2. Under OAuth & Permissions, request bot scopes \`chat:write\` (for notifications). Install app to your Slack workspace and invite it to a private \`#tradelink-seo-approvals\` channel.
-3. Under Interactivity & Shortcuts, enable interactivity, Request URL:
-   \`https://YOUR-RAILWAY-DOMAIN/slack/interactions\`
-4. Copy the app's **Signing Secret** and **Bot User OAuth Token** into Railway *private service variables*, not in GitHub or ChatGPT.
-5. Get actual Slack **channel ID**, **workspace/team ID**, and **approver member user IDs** from Slack. Do not use a username or display name as an authorization identity.
-6. Add variables to Railway \`seo-approvals\`, keeping PUBLISHING_ENABLED=false until all checks below pass.
+## Slack integration — REUSE the existing EmailCreator Slack app (preferred)
 
-Required vars:
-- DATABASE_URL = \${{Postgres.DATABASE_URL}} (Railway reference)
-- SLACK_SIGNING_SECRET = secret from app
-- SLACK_BOT_TOKEN = xoxb-...
-- SLACK_CHANNEL_ID = C... (private channel sometimes G...)
-- SLACK_TEAM_ID = T...
-- SLACK_APPROVER_IDS = U123,U456 (comma-separated)
-- PROPOSAL_API_TOKEN = high-entropy private token for the drafting agent (**already generated and stored privately in Railway during Phase 2 setup; do not regenerate casually**)
-- GITHUB_TOKEN = dedicated repo-scoped permission to read PRs and merge approved PRs
-- PUBLISHING_ENABLED = false (default)
-- BRANCH_PROTECTION_VERIFIED = false (default)
+**No second Slack app is necessary.** EmailCreator already receives Slack message events on its `/slack/events` route. Keep the existing Slack **Event Subscriptions Request URL** exactly as configured. Event Subscriptions and Interactivity & Shortcuts are separate app settings.
 
-GitHub token can be added before publishing is armed, but should not be enabled until branch protection and authenticated end-to-end Slack test pass. Never reuse the Google service account JSON. The Slack service does **not** need GSC credentials. The GSC collector keeps its separate read-only scope.
+1. Open the *existing* EmailCreator Slack app at https://api.slack.com/apps. Do **not** create another app and do **not** import the new-app manifest into the existing one.
+2. Open **Interactivity & Shortcuts**. If it is disabled or its Request URL is blank, enable it and set its Request URL to:
+   `https://seo-approvals-production.up.railway.app/slack/interactions`
+3. **If Interactivity & Shortcuts already has a URL, do not overwrite it.** Slack supports one interactivity callback per app: inspect existing consumers, then place a verified Slack interaction router in front of both destinations, dispatching `seo_approve`, `seo_reject`, `seo_revise`, and `seo_revision_modal` to the SEO gateway while keeping old actions on their old handler. Do not cut over without tests for both services.
+4. Verify the bot has the `chat:write` OAuth scope. Invite the **existing** Slack bot to a private `#tradelink-seo-approvals` channel.
+5. In the existing app's **Basic Information**, locate its signing secret. In **OAuth & Permissions**, locate its current bot token. Store these values *only* in Railway service variables for `seo-approvals`, never in this repo or chat. Do not rotate the existing secrets as part of this setup; rotation could break EmailCreator.
+6. Obtain actual Slack channel ID, workspace/team ID and authorized approver user IDs. Make the authorizer allowlist as narrow as necessary (user IDs, not display names).
+7. Keep publishing disarmed until a signed interactive callback has been successfully tested, EmailCreator is verified unaffected, and protected-main + GitHub app controls have been configured.
+
+Required variables on `seo-approvals`:
+- `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (Railway reference; already set)
+- `SLACK_SIGNING_SECRET` = existing app's Signing Secret
+- `SLACK_BOT_TOKEN` = existing app's Bot User OAuth Token
+- `SLACK_CHANNEL_ID` = private approvals channel ID
+- `SLACK_TEAM_ID` = workspace ID
+- `SLACK_APPROVER_IDS` = comma-separated Slack member IDs
+- `PROPOSAL_API_TOKEN` = stored privately already in Railway
+- `GITHUB_TOKEN` = separate, repo-scoped GitHub token for proposed PRs and approved merges
+- `PUBLISHING_ENABLED` = `false` until verified
+- `BRANCH_PROTECTION_VERIFIED` = `false` until verified
+
+One shared Slack app may post to multiple channels, but each subsystem keeps its own database and authorization checks. Do not replace EmailCreator's existing Events API URL, credentials or message handlers. The Slack service does **not** need GSC credentials; the SEO crawler remains read-only.
+
+For a completely new Slack workspace *without* a reusable app, `slack-app-manifest.yaml` is available as a fallback only, not the recommended integration.
 
 ## End-to-end acceptance test
 - /health shows Slack configured, DB configured, and publishing_armed false.

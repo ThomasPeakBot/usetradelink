@@ -29,6 +29,15 @@ class QualityGateTests(unittest.TestCase):
         self.assertFalse(r["passed"])
         self.assertTrue(any("too similar" in e for e in r["errors"]))
 
+    def test_repeated_disclosure_note_is_allowed(self):
+        note = ('<p class="note">Published by PeakBot, the maker of TradeLink. We identify where other tools are '
+                'a better fit and link to original sources whenever we compare products.</p>')
+        existing = {"https://usetradelink.com/x/": "Published by PeakBot, the maker of TradeLink. We identify where "
+                    "other tools are a better fit and link to original sources whenever we compare products."}
+        self.assertTrue(check(good_article(note * 3), existing)["passed"])
+        copied = good_article(note.replace(' class="note"', "") * 3)
+        self.assertFalse(check(copied, existing)["passed"])
+
     def test_thin_and_structural_problems(self):
         r = check("<html><head><title>x</title></head><body><h1>a</h1><h1>b</h1><p>Short.</p></body></html>")
         joined = " ".join(r["errors"])

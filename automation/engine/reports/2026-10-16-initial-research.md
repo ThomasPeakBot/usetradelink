@@ -57,8 +57,8 @@ How to read this:
 | /futures-trade-copier-risk-management/ | pass | 0 | — |
 
 
-The repeated failures are real:
-- the same boilerplate sentence appears on four pages
+The repeated failures are real (the "4 sentences copied" lines in the table above came from the vendor disclosure note
+"Published by PeakBot…", which is meant to repeat; the gate now ignores `p.note` disclosures):
 - competitor prices are stated in paragraphs that don't link their source
 - the disputed NinjaTrader claim
 - three meta descriptions are over 160 characters (fixed in #13)

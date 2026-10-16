@@ -63,7 +63,7 @@ class Blocks(HTMLParser):
         if tag == "h1":
             self.h1 += 1
         if tag in self.BLOCK and not self._skip:
-            self._cur = {"tag": tag, "text": [], "links": []}
+            self._cur = {"tag": tag, "text": [], "links": [], "class": a.get("class", "")}
         elif tag == "a" and self._cur is not None and a.get("href"):
             self._cur["links"].append(a["href"])
 
@@ -75,7 +75,8 @@ class Blocks(HTMLParser):
         elif tag in self.BLOCK and self._cur is not None and self._cur["tag"] == tag:
             text = re.sub(r"\s+", " ", "".join(self._cur["text"])).strip()
             if text:
-                self.blocks.append({"tag": tag, "text": text, "links": self._cur["links"]})
+                self.blocks.append({"tag": tag, "text": text, "links": self._cur["links"],
+                                    "class": self._cur["class"]})
             self._cur = None
 
     def handle_data(self, data):
@@ -145,7 +146,9 @@ def check(html, path, existing_texts, content_type="article", head_keyword="", f
             overlap[url] = round(j, 3)
             if j > 0.2:
                 errors.append(f"too similar to {url} (5-word shingle overlap {j:.0%})")
-    reused = [s for s in sentences(text) if any(s in other for other in existing_texts.values())]
+    # Disclosure notes ("Published by PeakBot, the maker of TradeLink…") are meant to repeat.
+    body = " ".join(b["text"] for b in doc.blocks if "note" not in b["class"].split())
+    reused = [s for s in sentences(body) if any(s in other for other in existing_texts.values())]
     if len(reused) > 2:
         errors.append(f"{len(reused)} sentences copied verbatim from existing pages, e.g. {reused[0][:90]!r}")
 

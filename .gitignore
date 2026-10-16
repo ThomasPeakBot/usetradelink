@@ -1,1 +1,4 @@
 _src/
+__pycache__/
+*.pyc
+_site/

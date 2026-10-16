@@ -1,0 +1,43 @@
+name: Deployment verification
+# Real HTTP checks against the Cloudflare preview of every PR and against
+# production. Read-only. Not a required check: a failing preview means the
+# deployed output differs from what the repository intends (for example
+# private files being served) and must be fixed before merging.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+jobs:
+  cloudflare-preview:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Wait for the Cloudflare preview of this commit
+        id: preview
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: echo "url=$(python scripts/cloudflare_preview_url.py ${{ github.event.pull_request.head.sha }})" >> "$GITHUB_OUTPUT"
+      - name: Verify preview
+        run: python scripts/verify_deploy.py "${{ steps.preview.outputs.url }}"
+  production:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify https://usetradelink.com
+        run: python scripts/verify_deploy.py https://usetradelink.com

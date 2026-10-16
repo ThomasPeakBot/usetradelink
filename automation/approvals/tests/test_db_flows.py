@@ -3,6 +3,7 @@
 Set TEST_DATABASE_URL (CI starts a Postgres service). Every test drops and
 recreates the approval tables, so never point this at a shared database.
 """
+import json
 import os
 import unittest
 import uuid
@@ -121,6 +122,8 @@ class ApprovalDatabaseFlows(unittest.TestCase):
         self.assertEqual((method, path), ("PUT", "/repos/ThomasPeakBot/usetradelink/pulls/25/merge"))
         self.assertEqual(gh.call_args[1]["json"]["sha"], SHA1)
         self.assertEqual(self.final(p)["status"], "merged_verification_pending")
+        paths = self.rows("SELECT detail FROM seo_approval_events WHERE kind='published_paths'")
+        self.assertEqual(json.loads(paths[0]["detail"]), ["resources/index.html"])
 
     def test_stale_running_job_needs_a_human(self):
         p = self.queue()

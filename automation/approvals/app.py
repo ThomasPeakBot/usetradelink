@@ -676,6 +676,7 @@ def publish_once():
             cur.execute("UPDATE seo_approval_proposals SET status='executing',updated_at=now() "
                         "WHERE id=%s", (p["id"],))
             record(cur, p["id"], "execution_started", "system", p["commit_sha"])
+    paths = []
     try:
         if not armed():
             raise ValueError("Publishing flag or required credentials disabled")
@@ -703,6 +704,9 @@ def publish_once():
             cur.execute("UPDATE seo_approval_jobs SET state='done',finished_at=now(),result=%s "
                         "WHERE proposal_id=%s", (detail, p["id"]))
             record(cur, p["id"], status, "system", detail)
+            if status in ("published_verified", "merged_verification_pending"):
+                # The SEO engine reads this to start measuring the change.
+                record(cur, p["id"], "published_paths", "system", json.dumps(paths))
     p["status"] = status
     inform(p, status + " (" + detail + ")")
     return True

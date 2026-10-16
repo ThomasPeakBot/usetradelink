@@ -1,0 +1,34 @@
+name: Deploy site (approval-gated)
+# Inactive until the repository variable SITE_DEPLOY_ENABLED is "true" and the
+# Cloudflare secrets exist. The `production` environment should require a named
+# reviewer, so every production deploy needs a human approval in GitHub.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: production-site
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: vars.SITE_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check site
+        run: python scripts/check_site.py
+      - name: Build public files only
+        run: python scripts/build_site.py
+      - name: Deploy _site to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy _site --project-name=usetradelink --branch=main --commit-hash=${{ github.sha }}

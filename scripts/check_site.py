@@ -125,6 +125,13 @@ class Page(HTMLParser):
 
 
 def tracked_files(root):
+    if not os.path.isdir(os.path.join(root, ".git")):
+        files = []
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+            files += [os.path.relpath(os.path.join(dirpath, f), root).replace(os.sep, "/")
+                      for f in filenames]
+        return files
     try:
         out = subprocess.run(["git", "ls-files"], cwd=root, capture_output=True, text=True,
                              check=True).stdout

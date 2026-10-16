@@ -33,3 +33,4 @@ img,video{max-width:100%;height:auto;}
 #tradelink-lander .switch-promo{padding-top:18px;}
 @media (max-width:900px){#tradelink-lander .hero{padding-bottom:28px;}#tradelink-lander .switch-promo{padding-top:16px;}}
 @media (max-width:620px){#tradelink-lander .hero{padding-bottom:24px;}#tradelink-lander .switch-promo{padding-top:12px;}}
+#tradelink-lander .step .media picture{display:block;width:100%;height:100%;}

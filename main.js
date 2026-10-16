@@ -106,12 +106,47 @@
     glowFrame = window.requestAnimationFrame(animateGlow);
   }
 
+  // The 6 MB product video only downloads when it is about to scroll into view.
+  function initLazyVideo(root) {
+    root.querySelectorAll('video[data-lazy-video]').forEach(function (video) {
+      if (video.dataset.lazyBound === '1') return;
+      video.dataset.lazyBound = '1';
+
+      function load() {
+        video.querySelectorAll('source[data-src]').forEach(function (source) {
+          source.src = source.getAttribute('data-src');
+          source.removeAttribute('data-src');
+        });
+        video.load();
+        var reduceMotion = window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!reduceMotion) {
+          var playing = video.play();
+          if (playing && playing.catch) playing.catch(function () {});
+        }
+      }
+
+      if (!('IntersectionObserver' in window)) {
+        load();
+        return;
+      }
+      var io = new IntersectionObserver(function (entries) {
+        if (entries[0].isIntersecting) {
+          io.disconnect();
+          load();
+        }
+      }, { rootMargin: '300px 0px' });
+      io.observe(video);
+    });
+  }
+
   function initTradeLink() {
     var root = getRoot();
     if (!root) return false;
 
     initReveal(root);
     initMouseGlow(root);
+    initLazyVideo(root);
     return true;
   }
 

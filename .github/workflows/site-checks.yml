@@ -18,3 +18,7 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Links, sitemap, canonicals, metadata and structured data
         run: python scripts/check_site.py
+      - name: Build public output and check it again
+        run: |
+          python scripts/build_site.py
+          python scripts/check_site.py _site

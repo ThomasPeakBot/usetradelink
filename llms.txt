@@ -27,3 +27,8 @@ Key facts (checked 2026-10-16):
 - [TradeLink vs Tradecopia: cloud price or platform flexibility?](https://usetradelink.com/compare/tradelink-vs-tradecopia/)
 - [Apex Tradovate trade copying: what works and what must you check?](https://usetradelink.com/apex-tradovate-trade-copier/)
 - [Futures trade copier guides and comparisons](https://usetradelink.com/resources/)
+
+## More operational guides
+- [Cloud futures trade copier vs desktop](https://usetradelink.com/cloud-futures-trade-copier/)
+- [Copy trades across Tradovate logins](https://usetradelink.com/tradovate-multiple-accounts/)
+- [Futures copier risk-management guide](https://usetradelink.com/futures-trade-copier-risk-management/)

@@ -46,3 +46,5 @@ jobs:
               assert doc.title_count == 1 and doc.h1_count == 1 and doc.canonical_count == 1, file
           print(f"Validated {len(urls)} sitemap URLs, page title/H1/canonical")
           PY
+      - name: Content safety guard (scripts, iframes, checkout links, canonicals)
+        run: python automation/approvals/content_guard.py .

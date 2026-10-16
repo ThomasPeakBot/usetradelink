@@ -10,6 +10,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import xml.etree.ElementTree as ET
 
 import psycopg
+from semrush import enrich as enrich_semrush
 import requests
 
 SITE = "https://usetradelink.com"
@@ -222,11 +223,20 @@ def main(argv=None):
         storage = "postgres"
     else:
         storage = "none"
+    semrush_result = {"status": "dry_run" if args.dry_run else "disabled",
+                     "requests": 0, "reserved_units": 0}
+    if not args.dry_run and storage == "postgres":
+        try:
+            semrush_result = enrich_semrush(os.environ["DATABASE_URL"], session=session)
+        except Exception as exc:
+            # Never expose API key, environment values or full HTTP traces.
+            semrush_result = {"status": "error:" + exc.__class__.__name__,
+                             "requests": 0, "reserved_units": 0}
     report = {"run_id": str(run_id), "pages": len(pages),
               "reachable": sum(p["http_status"] == 200 for p in pages),
               "issues": sum(len(p["issues"]) for p in pages),
               "gsc_rows": len(gsc_rows), "gsc_status": gsc_status,
-              "storage": storage, "publishing_enabled": False,
+              "semrush": semrush_result, "storage": storage, "publishing_enabled": False,
               "page_issues": [{"url": p["url"], "issues": p["issues"]}
                               for p in pages if p["issues"]]}
     print(json.dumps(report, sort_keys=True))

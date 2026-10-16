@@ -1,0 +1,22 @@
+# TradeLink by PeakBot
+
+> TradeLink is a cloud-based futures trade copier made by PeakBot. You place a trade in one leader account and TradeLink copies the leader's fills to follower accounts, with per-follower sizing and risk rules. One plan: $40/month, unlimited supported connections, up to 150 accounts.
+
+Key facts (checked 2026-10-16):
+- Price: $40/month, one plan. No standard free trial. Traders switching from another paid futures copier get the first month free plus $20 after the first successful renewal, with proof of cancellation.
+- Connections: futures accounts connect through a Tradovate login, live or paper. Rithmic is coming soon and isn't live yet.
+- Copying: fill-based, including partial fills. Followers can copy 1:1, by multiplier or by fixed quantity. Unlimited copy groups.
+- Risk: ten protection rules, including daily loss and profit limits. You can pause, flatten or lock one follower or a whole group.
+- Runs server-side, so no browser window or VPS needs to stay open.
+- Includes a trade journal with CSV export.
+- Copying doesn't guarantee identical fills. Check each prop firm's copy-trading rules.
+
+## Pages
+- [TradeLink homepage](https://usetradelink.com/): product overview, pricing, switch offer, FAQ
+- [Tradovate trade copier guide](https://usetradelink.com/tradovate-trade-copier/): Tradovate Group Trade compared with a cloud copier, plus setup steps
+- [TradeLink vs TradeSyncer](https://usetradelink.com/compare/tradelink-vs-tradesyncer/): sourced comparison of pricing, limits and platforms
+- [What is a futures trade copier?](https://usetradelink.com/futures-trade-copier/): how leader/follower copying works and what to check
+
+## Optional
+- [Start TradeLink checkout](https://tlink.peakbot.com/checkout/price_1UDhh0BZsQfGLBPdlnScmYrH)
+- [PeakBot](https://peakbot.com/)

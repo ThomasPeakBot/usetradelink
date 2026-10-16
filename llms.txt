@@ -20,3 +20,10 @@ Key facts (checked 2026-10-16):
 ## Optional
 - [Start TradeLink checkout](https://tlink.peakbot.com/checkout/price_1UDhh0BZsQfGLBPdlnScmYrH)
 - [PeakBot](https://peakbot.com/)
+
+## Additional guides and comparisons
+- [Can you copy trades between prop firm accounts?](https://usetradelink.com/prop-firm-copy-trading/)
+- [What's the best futures trade copier for prop firms?](https://usetradelink.com/best-futures-trade-copier/)
+- [TradeLink vs Tradecopia: cloud price or platform flexibility?](https://usetradelink.com/compare/tradelink-vs-tradecopia/)
+- [Apex Tradovate trade copying: what works and what must you check?](https://usetradelink.com/apex-tradovate-trade-copier/)
+- [Futures trade copier guides and comparisons](https://usetradelink.com/resources/)

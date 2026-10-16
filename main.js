@@ -218,6 +218,13 @@
       childList: true,
       subtree: true
     });
+
+    // Third-party widgets (chat, pixels) keep mutating the DOM; stop re-scanning
+    // once the page has settled instead of querying on every mutation forever.
+    window.setTimeout(function () {
+      observer.disconnect();
+      init();
+    }, 5000);
   }
 
   if (document.readyState === 'loading') {

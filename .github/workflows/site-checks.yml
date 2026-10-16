@@ -1,0 +1,20 @@
+name: Site checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  site-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit tests for the checker
+        run: python -m unittest discover -s tests -v
+      - name: Links, sitemap, canonicals, metadata and structured data
+        run: python scripts/check_site.py

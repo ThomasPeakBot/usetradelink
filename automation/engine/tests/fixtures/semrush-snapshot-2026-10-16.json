@@ -1,0 +1,1153 @@
+{
+  "collected_at": "2026-10-16T20:37:11+00:00",
+  "source": "Semrush MCP",
+  "database": "us",
+  "calls": [
+    {
+      "report": "phrase_these",
+      "params": {
+        "database": "us",
+        "phrase": "futures trade copier;tradovate trade copier;prop firm trade copier;trade copier for prop firms;copy trading futures;tradovate group trade;tradesyncer;tradecopia;apex trade copier;topstep copy trading;cloud trade copier;tradovate multiple accounts",
+        "export_columns": [
+          "keyword",
+          "volume",
+          "cpc",
+          "competitive_density",
+          "results",
+          "trend",
+          "intent",
+          "keyword_difficulty"
+        ]
+      },
+      "status": "ok",
+      "error": null,
+      "units_note": "response metadata usage.api_units = 120",
+      "columns": [
+        "Keyword",
+        "Search Volume",
+        "CPC",
+        "Competition",
+        "Number of Results",
+        "Trends",
+        "Intent",
+        "Keyword Difficulty Index"
+      ],
+      "rows": [
+        {
+          "Keyword": "futures trade copier",
+          "Search Volume": "140",
+          "CPC": "3.42",
+          "Competition": "0.24",
+          "Number of Results": "118",
+          "Trends": "0.34,0.34,0.15,0.12,0.28,1.00,0.34,0.34,0.34,0.65,1.00,0.43",
+          "Intent": "1",
+          "Keyword Difficulty Index": "6"
+        },
+        {
+          "Keyword": "tradovate trade copier",
+          "Search Volume": "170",
+          "CPC": "3.7",
+          "Competition": "0.34",
+          "Number of Results": "106",
+          "Trends": "0.29,0.19,0.15,0.19,0.29,0.44,0.23,0.19,0.19,0.36,0.29,0.29",
+          "Intent": "1",
+          "Keyword Difficulty Index": "19"
+        },
+        {
+          "Keyword": "prop firm trade copier",
+          "Search Volume": "50",
+          "CPC": "2.18",
+          "Competition": "0.31",
+          "Number of Results": "0",
+          "Trends": "0.14,0.14,0.14,0.14,0.14,0.14,0.14,0.28,0.28,0.78,0.78,0.78",
+          "Intent": "",
+          "Keyword Difficulty Index": "0"
+        },
+        {
+          "Keyword": "trade copier for prop firms",
+          "Search Volume": "30",
+          "CPC": "2.42",
+          "Competition": "0.56",
+          "Number of Results": "0",
+          "Trends": "0.18,0.18,0.18,0.18,0.18,0.18,0.18,0.18,0.18,0.45,0.63,0.63",
+          "Intent": "",
+          "Keyword Difficulty Index": "0"
+        },
+        {
+          "Keyword": "copy trading futures",
+          "Search Volume": "40",
+          "CPC": "5.56",
+          "Competition": "0.5",
+          "Number of Results": "120",
+          "Trends": "0.14,0.21,0.14,0.14,0.14,0.14,0.14,0.14,0.14,1.00,0.78,0.78",
+          "Intent": "1,0",
+          "Keyword Difficulty Index": "29"
+        },
+        {
+          "Keyword": "tradovate group trade",
+          "Search Volume": "170",
+          "CPC": "7.88",
+          "Competition": "0.24",
+          "Number of Results": "108",
+          "Trends": "0.53,0.21,0.21,0.28,0.65,1.00,0.81,0.81,0.81,0.43,0.21,0.53",
+          "Intent": "1",
+          "Keyword Difficulty Index": "21"
+        },
+        {
+          "Keyword": "tradesyncer",
+          "Search Volume": "18100",
+          "CPC": "0.68",
+          "Competition": "0.26",
+          "Number of Results": "0",
+          "Trends": "0.20,0.36,0.36,0.16,0.20,0.54,0.29,0.66,0.81,1.00,1.00,1.00",
+          "Intent": "2,0",
+          "Keyword Difficulty Index": "35"
+        },
+        {
+          "Keyword": "tradecopia",
+          "Search Volume": "9900",
+          "CPC": "1.74",
+          "Competition": "0.45",
+          "Number of Results": "0",
+          "Trends": "0.00,0.05,0.07,0.03,0.07,0.36,0.54,1.00,0.20,0.24,0.29,0.81",
+          "Intent": "2,0",
+          "Keyword Difficulty Index": "14"
+        },
+        {
+          "Keyword": "apex trade copier",
+          "Search Volume": "260",
+          "CPC": "3.55",
+          "Competition": "0.21",
+          "Number of Results": "108",
+          "Trends": "0.20,0.20,0.24,0.20,0.20,0.20,0.20,0.30,0.20,0.20,0.20,0.20",
+          "Intent": "1",
+          "Keyword Difficulty Index": "12"
+        },
+        {
+          "Keyword": "topstep copy trading",
+          "Search Volume": "90",
+          "CPC": "3.11",
+          "Competition": "0.12",
+          "Number of Results": "263",
+          "Trends": "1.00,0.52,0.41,0.64,0.23,0.64,0.41,0.17,0.41,0.52,0.64,0.64",
+          "Intent": "1",
+          "Keyword Difficulty Index": "15"
+        },
+        {
+          "Keyword": "cloud trade copier",
+          "Search Volume": "30",
+          "CPC": "2.3",
+          "Competition": "0.22",
+          "Number of Results": "0",
+          "Trends": "0.22,0.22,0.22,0.22,0.22,0.22,0.22,0.22,0.22,0.44,0.55,1.00",
+          "Intent": "",
+          "Keyword Difficulty Index": "0"
+        },
+        {
+          "Keyword": "tradovate multiple accounts",
+          "Search Volume": "20",
+          "CPC": "0",
+          "Competition": "0.11",
+          "Number of Results": "0",
+          "Trends": "0.14,0.14,0.14,0.14,0.14,0.14,0.14,0.14,0.14,0.14,0.14,0.14",
+          "Intent": "",
+          "Keyword Difficulty Index": "0"
+        }
+      ]
+    },
+    {
+      "report": "phrase_related",
+      "params": {
+        "database": "us",
+        "phrase": "futures trade copier",
+        "display_limit": 20,
+        "export_columns": [
+          "keyword",
+          "volume",
+          "cpc",
+          "competitive_density",
+          "results",
+          "relevance",
+          "intent",
+          "keyword_difficulty"
+        ]
+      },
+      "status": "ok",
+      "error": null,
+      "units_note": "response metadata usage.api_units = 1850",
+      "columns": [
+        "Keyword",
+        "Search Volume",
+        "CPC",
+        "Competition",
+        "Number of Results",
+        "Related Relevance",
+        "Intent",
+        "Keyword Difficulty Index"
+      ],
+      "rows": [
+        {
+          "Keyword": "copyrate",
+          "Search Volume": "27100",
+          "CPC": "2.19",
+          "Competition": "0.17",
+          "Number of Results": "107",
+          "Related Relevance": "0.1",
+          "Intent": "1",
+          "Keyword Difficulty Index": "41"
+        },
+        {
+          "Keyword": "tradesyncer",
+          "Search Volume": "18100",
+          "CPC": "0.68",
+          "Competition": "0.26",
+          "Number of Results": "0",
+          "Related Relevance": "0.1",
+          "Intent": "2,0",
+          "Keyword Difficulty Index": "35"
+        },
+        {
+          "Keyword": "tradecopia",
+          "Search Volume": "9900",
+          "CPC": "1.74",
+          "Competition": "0.45",
+          "Number of Results": "0",
+          "Related Relevance": "0.1",
+          "Intent": "2,0",
+          "Keyword Difficulty Index": "14"
+        },
+        {
+          "Keyword": "largest copy trading platforms",
+          "Search Volume": "5400",
+          "CPC": "0",
+          "Competition": "0",
+          "Number of Results": "118",
+          "Related Relevance": "0.15",
+          "Intent": "1,0",
+          "Keyword Difficulty Index": "69"
+        },
+        {
+          "Keyword": "tradersync",
+          "Search Volume": "4400",
+          "CPC": "1.07",
+          "Competition": "0.22",
+          "Number of Results": "0",
+          "Related Relevance": "0.05",
+          "Intent": "2",
+          "Keyword Difficulty Index": "42"
+        },
+        {
+          "Keyword": "copy trading platforms and strategies",
+          "Search Volume": "2900",
+          "CPC": "0",
+          "Competition": "0",
+          "Number of Results": "120",
+          "Related Relevance": "0.05",
+          "Intent": "1",
+          "Keyword Difficulty Index": "59"
+        },
+        {
+          "Keyword": "copier trade",
+          "Search Volume": "2400",
+          "CPC": "2.6",
+          "Competition": "0.52",
+          "Number of Results": "128",
+          "Related Relevance": "0.25",
+          "Intent": "",
+          "Keyword Difficulty Index": "26"
+        },
+        {
+          "Keyword": "copy trading platforms",
+          "Search Volume": "1900",
+          "CPC": "6.33",
+          "Competition": "0.49",
+          "Number of Results": "118",
+          "Related Relevance": "0.2",
+          "Intent": "1,0",
+          "Keyword Difficulty Index": "70"
+        },
+        {
+          "Keyword": "copy trading platforms architecture",
+          "Search Volume": "1900",
+          "CPC": "0",
+          "Competition": "0",
+          "Number of Results": "118",
+          "Related Relevance": "0.05",
+          "Intent": "1",
+          "Keyword Difficulty Index": "5"
+        },
+        {
+          "Keyword": "trade copier",
+          "Search Volume": "1600",
+          "CPC": "1.74",
+          "Competition": "0.45",
+          "Number of Results": "122",
+          "Related Relevance": "0.35",
+          "Intent": "1,0",
+          "Keyword Difficulty Index": "56"
+        },
+        {
+          "Keyword": "centralized copy trading platforms",
+          "Search Volume": "1300",
+          "CPC": "0",
+          "Competition": "0",
+          "Number of Results": "5930000",
+          "Related Relevance": "0.15",
+          "Intent": "1,0",
+          "Keyword Difficulty Index": "58"
+        },
+        {
+          "Keyword": "traders connect",
+          "Search Volume": "1300",
+          "CPC": "2.23",
+          "Competition": "0.34",
+          "Number of Results": "0",
+          "Related Relevance": "0.05",
+          "Intent": "2",
+          "Keyword Difficulty Index": "26"
+        },
+        {
+          "Keyword": "copy trade",
+          "Search Volume": "1000",
+          "CPC": "4.03",
+          "Competition": "0.32",
+          "Number of Results": "130",
+          "Related Relevance": "0.2",
+          "Intent": "1",
+          "Keyword Difficulty Index": "71"
+        },
+        {
+          "Keyword": "prop firms that support ctrader and copy trading",
+          "Search Volume": "1000",
+          "CPC": "0",
+          "Competition": "0",
+          "Number of Results": "128",
+          "Related Relevance": "0.1",
+          "Intent": "1",
+          "Keyword Difficulty Index": "18"
+        },
+        {
+          "Keyword": "best copy trading platform",
+          "Search Volume": "880",
+          "CPC": "5.09",
+          "Competition": "0.45",
+          "Number of Results": "106",
+          "Related Relevance": "0.2",
+          "Intent": "0",
+          "Keyword Difficulty Index": "71"
+        },
+        {
+          "Keyword": "copygram",
+          "Search Volume": "880",
+          "CPC": "2.11",
+          "Competition": "0.23",
+          "Number of Results": "0",
+          "Related Relevance": "0.05",
+          "Intent": "2",
+          "Keyword Difficulty Index": "23"
+        },
+        {
+          "Keyword": "copytrader",
+          "Search Volume": "880",
+          "CPC": "2.27",
+          "Competition": "0.5",
+          "Number of Results": "129",
+          "Related Relevance": "0.1",
+          "Intent": "1",
+          "Keyword Difficulty Index": "75"
+        },
+        {
+          "Keyword": "http track website copier",
+          "Search Volume": "880",
+          "CPC": "0",
+          "Competition": "0.33",
+          "Number of Results": "130",
+          "Related Relevance": "0.05",
+          "Intent": "1",
+          "Keyword Difficulty Index": "51"
+        },
+        {
+          "Keyword": "popular copy trading platforms",
+          "Search Volume": "880",
+          "CPC": "0",
+          "Competition": "0",
+          "Number of Results": "102",
+          "Related Relevance": "0.1",
+          "Intent": "1,0",
+          "Keyword Difficulty Index": "0"
+        },
+        {
+          "Keyword": "trade sync",
+          "Search Volume": "880",
+          "CPC": "1.03",
+          "Competition": "0.3",
+          "Number of Results": "117",
+          "Related Relevance": "0.2",
+          "Intent": "0",
+          "Keyword Difficulty Index": "25"
+        }
+      ]
+    },
+    {
+      "report": "phrase_questions",
+      "params": {
+        "database": "us",
+        "phrase": "trade copier",
+        "display_limit": 15,
+        "export_columns": [
+          "keyword",
+          "volume",
+          "cpc",
+          "competitive_density",
+          "results",
+          "keyword_difficulty"
+        ]
+      },
+      "status": "ok",
+      "error": null,
+      "units_note": "response metadata usage.api_units = 1650",
+      "columns": [
+        "Keyword",
+        "Search Volume",
+        "CPC",
+        "Competition",
+        "Number of Results",
+        "Keyword Difficulty Index"
+      ],
+      "rows": [
+        {
+          "Keyword": "how to copy trade on tradovate",
+          "Search Volume": "480",
+          "CPC": "2.42",
+          "Competition": "0.12",
+          "Number of Results": "108",
+          "Keyword Difficulty Index": "18"
+        },
+        {
+          "Keyword": "how to copy trade",
+          "Search Volume": "210",
+          "CPC": "4.26",
+          "Competition": "0.18",
+          "Number of Results": "109",
+          "Keyword Difficulty Index": "49"
+        },
+        {
+          "Keyword": "does tradovate have a trade copier",
+          "Search Volume": "140",
+          "CPC": "2.8",
+          "Competition": "0.11",
+          "Number of Results": "100",
+          "Keyword Difficulty Index": "15"
+        },
+        {
+          "Keyword": "how to copy trade on topstep",
+          "Search Volume": "140",
+          "CPC": "0",
+          "Competition": "0.02",
+          "Number of Results": "118",
+          "Keyword Difficulty Index": "25"
+        },
+        {
+          "Keyword": "how to copy trade on tradingview",
+          "Search Volume": "140",
+          "CPC": "4.29",
+          "Competition": "0.06",
+          "Number of Results": "109",
+          "Keyword Difficulty Index": "9"
+        },
+        {
+          "Keyword": "how to copy trades on polymarket",
+          "Search Volume": "140",
+          "CPC": "21.79",
+          "Competition": "0.18",
+          "Number of Results": "105",
+          "Keyword Difficulty Index": "29"
+        },
+        {
+          "Keyword": "how to copy trades on tradovate",
+          "Search Volume": "140",
+          "CPC": "4.41",
+          "Competition": "0.13",
+          "Number of Results": "109",
+          "Keyword Difficulty Index": "18"
+        },
+        {
+          "Keyword": "can you copy trade on tradingview",
+          "Search Volume": "110",
+          "CPC": "2.93",
+          "Competition": "0.05",
+          "Number of Results": "109",
+          "Keyword Difficulty Index": "7"
+        },
+        {
+          "Keyword": "can you copy trade on tradovate",
+          "Search Volume": "90",
+          "CPC": "9.18",
+          "Competition": "0.08",
+          "Number of Results": "105",
+          "Keyword Difficulty Index": "13"
+        },
+        {
+          "Keyword": "how to copy trade topstep",
+          "Search Volume": "90",
+          "CPC": "0",
+          "Competition": "0.33",
+          "Number of Results": "99",
+          "Keyword Difficulty Index": "12"
+        },
+        {
+          "Keyword": "can you copy trade on lucid trading",
+          "Search Volume": "70",
+          "CPC": "0",
+          "Competition": "0.02",
+          "Number of Results": "108",
+          "Keyword Difficulty Index": "13"
+        },
+        {
+          "Keyword": "how to copy trade on fomo",
+          "Search Volume": "70",
+          "CPC": "5.99",
+          "Competition": "0.04",
+          "Number of Results": "0",
+          "Keyword Difficulty Index": "0"
+        },
+        {
+          "Keyword": "how to copy trade on lucid trading",
+          "Search Volume": "70",
+          "CPC": "0",
+          "Competition": "0.02",
+          "Number of Results": "0",
+          "Keyword Difficulty Index": "0"
+        },
+        {
+          "Keyword": "how to copy trade tradovate on tradingview",
+          "Search Volume": "70",
+          "CPC": "0",
+          "Competition": "0.33",
+          "Number of Results": "109",
+          "Keyword Difficulty Index": "16"
+        },
+        {
+          "Keyword": "how to copy trade lucid accounts",
+          "Search Volume": "50",
+          "CPC": "0",
+          "Competition": "0.03",
+          "Number of Results": "105",
+          "Keyword Difficulty Index": "0"
+        }
+      ]
+    },
+    {
+      "report": "resource_organic",
+      "params": {
+        "database": "us",
+        "target": "tradesyncer.com",
+        "display_limit": 25,
+        "display_sort": "traffic_desc",
+        "export_columns": [
+          "keyword",
+          "position",
+          "volume",
+          "cpc",
+          "url",
+          "traffic",
+          "traffic_share",
+          "keyword_difficulty",
+          "intent"
+        ]
+      },
+      "status": "ok",
+      "error": null,
+      "units_note": "response metadata usage.api_units = 1650",
+      "columns": [
+        "Keyword",
+        "Position",
+        "Search Volume",
+        "CPC",
+        "Url",
+        "Traffic",
+        "Traffic (%)",
+        "Keyword Difficulty",
+        "Intents"
+      ],
+      "rows": [
+        {
+          "Keyword": "trade syncer",
+          "Position": "1",
+          "Search Volume": "5400",
+          "CPC": "0.83",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "4320",
+          "Traffic (%)": "19.60",
+          "Keyword Difficulty": "45.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "tradesync",
+          "Position": "1",
+          "Search Volume": "2400",
+          "CPC": "1.20",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "1920",
+          "Traffic (%)": "8.71",
+          "Keyword Difficulty": "45.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "tradesyncer",
+          "Position": "1",
+          "Search Volume": "22200",
+          "CPC": "0.69",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "577",
+          "Traffic (%)": "2.61",
+          "Keyword Difficulty": "50.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "trade syncher",
+          "Position": "1",
+          "Search Volume": "720",
+          "CPC": "0.83",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "576",
+          "Traffic (%)": "2.61",
+          "Keyword Difficulty": "44.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "tradersyncer",
+          "Position": "1",
+          "Search Volume": "590",
+          "CPC": "0.68",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "472",
+          "Traffic (%)": "2.14",
+          "Keyword Difficulty": "35.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "trade copier",
+          "Position": "1",
+          "Search Volume": "1900",
+          "CPC": "1.81",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "471",
+          "Traffic (%)": "2.13",
+          "Keyword Difficulty": "50.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "tradesyncer login",
+          "Position": "1",
+          "Search Volume": "480",
+          "CPC": "0.05",
+          "Url": "https://app.tradesyncer.com/",
+          "Traffic": "384",
+          "Traffic (%)": "1.74",
+          "Keyword Difficulty": "11.00",
+          "Intents": "2,3"
+        },
+        {
+          "Keyword": "tradesycner",
+          "Position": "1",
+          "Search Volume": "480",
+          "CPC": "0.00",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "384",
+          "Traffic (%)": "1.74",
+          "Keyword Difficulty": "41.00",
+          "Intents": "0,2"
+        },
+        {
+          "Keyword": "tradesyncer trade copier",
+          "Position": "1",
+          "Search Volume": "390",
+          "CPC": "0.00",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "312",
+          "Traffic (%)": "1.41",
+          "Keyword Difficulty": "7.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "copy trading",
+          "Position": "2",
+          "Search Volume": "4400",
+          "CPC": "5.17",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "286",
+          "Traffic (%)": "1.29",
+          "Keyword Difficulty": "77.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "copy trading platforms",
+          "Position": "1",
+          "Search Volume": "1900",
+          "CPC": "5.42",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "250",
+          "Traffic (%)": "1.13",
+          "Keyword Difficulty": "73.00",
+          "Intents": "0,1"
+        },
+        {
+          "Keyword": "trade sync",
+          "Position": "1",
+          "Search Volume": "880",
+          "CPC": "1.03",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "218",
+          "Traffic (%)": "0.98",
+          "Keyword Difficulty": "25.00",
+          "Intents": "0"
+        },
+        {
+          "Keyword": "trader syncer",
+          "Position": "1",
+          "Search Volume": "260",
+          "CPC": "2.65",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "208",
+          "Traffic (%)": "0.94",
+          "Keyword Difficulty": "20.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "tradesyner",
+          "Position": "1",
+          "Search Volume": "260",
+          "CPC": "0.69",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "208",
+          "Traffic (%)": "0.94",
+          "Keyword Difficulty": "39.00",
+          "Intents": "2,3"
+        },
+        {
+          "Keyword": "copier trade",
+          "Position": "1",
+          "Search Volume": "2400",
+          "CPC": "2.99",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "196",
+          "Traffic (%)": "0.88",
+          "Keyword Difficulty": "68.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "centralized copy trading platforms",
+          "Position": "1",
+          "Search Volume": "1300",
+          "CPC": "0.00",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "171",
+          "Traffic (%)": "0.77",
+          "Keyword Difficulty": "58.00",
+          "Intents": ""
+        },
+        {
+          "Keyword": "tradesyncer pricing",
+          "Position": "1",
+          "Search Volume": "210",
+          "CPC": "0.57",
+          "Url": "https://tradesyncer.com/pricing/",
+          "Traffic": "168",
+          "Traffic (%)": "0.76",
+          "Keyword Difficulty": "11.00",
+          "Intents": "3"
+        },
+        {
+          "Keyword": "tradesyncer app",
+          "Position": "1",
+          "Search Volume": "210",
+          "CPC": "1.50",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "168",
+          "Traffic (%)": "0.76",
+          "Keyword Difficulty": "42.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "trading syncer",
+          "Position": "1",
+          "Search Volume": "210",
+          "CPC": "1.12",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "168",
+          "Traffic (%)": "0.76",
+          "Keyword Difficulty": "40.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "tradesyncer sign in",
+          "Position": "1",
+          "Search Volume": "170",
+          "CPC": "5.29",
+          "Url": "https://app.tradesyncer.com/",
+          "Traffic": "136",
+          "Traffic (%)": "0.61",
+          "Keyword Difficulty": "10.00",
+          "Intents": "2,3"
+        },
+        {
+          "Keyword": "copytrader",
+          "Position": "2",
+          "Search Volume": "880",
+          "CPC": "2.27",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "116",
+          "Traffic (%)": "0.52",
+          "Keyword Difficulty": "75.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "trade sinker",
+          "Position": "1",
+          "Search Volume": "140",
+          "CPC": "3.05",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "112",
+          "Traffic (%)": "0.50",
+          "Keyword Difficulty": "17.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "tradesycer",
+          "Position": "1",
+          "Search Volume": "140",
+          "CPC": "0.68",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "112",
+          "Traffic (%)": "0.50",
+          "Keyword Difficulty": "36.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "tradesyncer copy trading",
+          "Position": "1",
+          "Search Volume": "140",
+          "CPC": "0.00",
+          "Url": "https://tradesyncer.com/",
+          "Traffic": "112",
+          "Traffic (%)": "0.50",
+          "Keyword Difficulty": "19.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "tradesyncer log in",
+          "Position": "1",
+          "Search Volume": "110",
+          "CPC": "7.51",
+          "Url": "https://app.tradesyncer.com/",
+          "Traffic": "88",
+          "Traffic (%)": "0.39",
+          "Keyword Difficulty": "7.00",
+          "Intents": "2,3"
+        }
+      ]
+    },
+    {
+      "report": "resource_organic",
+      "params": {
+        "database": "us",
+        "target": "tradecopia.com",
+        "display_limit": 20,
+        "display_sort": "traffic_desc",
+        "export_columns": [
+          "keyword",
+          "position",
+          "volume",
+          "cpc",
+          "url",
+          "traffic",
+          "traffic_share",
+          "keyword_difficulty",
+          "intent"
+        ]
+      },
+      "status": "ok",
+      "error": null,
+      "units_note": "response metadata usage.api_units = 200",
+      "columns": [
+        "Keyword",
+        "Position",
+        "Search Volume",
+        "CPC",
+        "Url",
+        "Traffic",
+        "Traffic (%)",
+        "Keyword Difficulty",
+        "Intents"
+      ],
+      "rows": [
+        {
+          "Keyword": "tradecopia",
+          "Position": "1",
+          "Search Volume": "12100",
+          "CPC": "1.74",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "9680",
+          "Traffic (%)": "80.65",
+          "Keyword Difficulty": "14.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "how does a trade replication engine work",
+          "Position": "1",
+          "Search Volume": "2400",
+          "CPC": "0.00",
+          "Url": "https://tradecopia.com/learn/how-a-trade-replication-engine-works",
+          "Traffic": "316",
+          "Traffic (%)": "2.63",
+          "Keyword Difficulty": "3.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "trade copier",
+          "Position": "2",
+          "Search Volume": "1900",
+          "CPC": "1.81",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "250",
+          "Traffic (%)": "2.08",
+          "Keyword Difficulty": "50.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "copier trade",
+          "Position": "2",
+          "Search Volume": "2400",
+          "CPC": "2.99",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "156",
+          "Traffic (%)": "1.29",
+          "Keyword Difficulty": "68.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "copy trader",
+          "Position": "1",
+          "Search Volume": "590",
+          "CPC": "2.27",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "146",
+          "Traffic (%)": "1.21",
+          "Keyword Difficulty": "31.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "how does a trade replication engine work",
+          "Position": "2",
+          "Search Volume": "2400",
+          "CPC": "0.00",
+          "Url": "https://tradecopia.com/learn/what-is-copy-trading",
+          "Traffic": "72",
+          "Traffic (%)": "0.59",
+          "Keyword Difficulty": "3.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "copy trading platforms architecture",
+          "Position": "5",
+          "Search Volume": "1900",
+          "CPC": "0.00",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "57",
+          "Traffic (%)": "0.47",
+          "Keyword Difficulty": "5.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "tradecopi",
+          "Position": "1",
+          "Search Volume": "70",
+          "CPC": "2.08",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "56",
+          "Traffic (%)": "0.46",
+          "Keyword Difficulty": "31.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "copy trading platforms",
+          "Position": "7",
+          "Search Volume": "1900",
+          "CPC": "5.42",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "45",
+          "Traffic (%)": "0.37",
+          "Keyword Difficulty": "73.00",
+          "Intents": "0,1"
+        },
+        {
+          "Keyword": "tradecopia price",
+          "Position": "1",
+          "Search Volume": "50",
+          "CPC": "3.36",
+          "Url": "https://tradecopia.com/pricing",
+          "Traffic": "40",
+          "Traffic (%)": "0.33",
+          "Keyword Difficulty": "0.0",
+          "Intents": "2,3"
+        },
+        {
+          "Keyword": "tradecopier",
+          "Position": "3",
+          "Search Volume": "590",
+          "CPC": "2.08",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "38",
+          "Traffic (%)": "0.31",
+          "Keyword Difficulty": "15.00",
+          "Intents": "0"
+        },
+        {
+          "Keyword": "best copy trading platform",
+          "Position": "3",
+          "Search Volume": "880",
+          "CPC": "7.02",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "38",
+          "Traffic (%)": "0.31",
+          "Keyword Difficulty": "73.00",
+          "Intents": "0"
+        },
+        {
+          "Keyword": "futures trade copier",
+          "Position": "1",
+          "Search Volume": "140",
+          "CPC": "3.42",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "34",
+          "Traffic (%)": "0.28",
+          "Keyword Difficulty": "6.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "tradecopa",
+          "Position": "1",
+          "Search Volume": "40",
+          "CPC": "1.74",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "32",
+          "Traffic (%)": "0.26",
+          "Keyword Difficulty": "20.00",
+          "Intents": "2"
+        },
+        {
+          "Keyword": "largest copy trading platforms",
+          "Position": "7",
+          "Search Volume": "3600",
+          "CPC": "0.00",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "32",
+          "Traffic (%)": "0.26",
+          "Keyword Difficulty": "51.00",
+          "Intents": "0,1"
+        },
+        {
+          "Keyword": "copy trading prop firms",
+          "Position": "1",
+          "Search Volume": "210",
+          "CPC": "2.29",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "27",
+          "Traffic (%)": "0.22",
+          "Keyword Difficulty": "14.00",
+          "Intents": "0,1"
+        },
+        {
+          "Keyword": "copy trading software",
+          "Position": "1",
+          "Search Volume": "210",
+          "CPC": "1.79",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "27",
+          "Traffic (%)": "0.22",
+          "Keyword Difficulty": "51.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "copytrader",
+          "Position": "4",
+          "Search Volume": "880",
+          "CPC": "2.27",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "26",
+          "Traffic (%)": "0.21",
+          "Keyword Difficulty": "75.00",
+          "Intents": "1"
+        },
+        {
+          "Keyword": "copy trade software",
+          "Position": "1",
+          "Search Volume": "170",
+          "CPC": "1.79",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "22",
+          "Traffic (%)": "0.18",
+          "Keyword Difficulty": "57.00",
+          "Intents": "0,1"
+        },
+        {
+          "Keyword": "copy trade",
+          "Position": "8",
+          "Search Volume": "1000",
+          "CPC": "4.03",
+          "Url": "https://tradecopia.com/",
+          "Traffic": "22",
+          "Traffic (%)": "0.18",
+          "Keyword Difficulty": "71.00",
+          "Intents": "1"
+        }
+      ]
+    },
+    {
+      "report": "domain_organic_organic",
+      "params": {
+        "database": "us",
+        "domain": "usetradelink.com",
+        "display_limit": 10
+      },
+      "status": "error",
+      "error": {
+        "code": "internal",
+        "message": "get domain_organic_organic: ERROR 50 :: NOTHING FOUND\nNo data found for this request. Verify your parameters are correct. If parameters are valid, try a different date range or target.\nnot found",
+        "retryable": false,
+        "trace_id": "9c0e31cba518ad28a726a24ffa65d9fa"
+      },
+      "units_note": null,
+      "columns": [],
+      "rows": []
+    },
+    {
+      "report": "domain_rank",
+      "params": {
+        "database": "us",
+        "target": "usetradelink.com"
+      },
+      "status": "error",
+      "error": {
+        "code": "internal",
+        "message": "get domain_rank: ERROR 50 :: NOTHING FOUND\nNo data found for this request. Verify your parameters are correct. If parameters are valid, try a different date range or target.\nnot found",
+        "retryable": false,
+        "trace_id": "a634acc4575d59282ab2dd41f3acaea8"
+      },
+      "units_note": null,
+      "columns": [],
+      "rows": []
+    }
+  ],
+  "notes": [
+    "All values are copied verbatim as strings from the semicolon-delimited CSV returned by Semrush MCP execute_report (metadata.format = 'csv'). No conversion applied.",
+    "CPC units: the responses do not state a currency or unit. Semrush v3 Analytics reports (which these appear to be, given CSV format and column names) report CPC in USD dollars; v4 reports may use cents. Not confirmed by the response itself.",
+    "Intent codes as returned by Semrush (commonly 0=commercial, 1=informational, 2=navigational, 3=transactional per Semrush docs; the response does not define them). Trends = 12 monthly values normalized to 1.00 at peak.",
+    "Volume for the same keyword differs across reports (e.g. 'tradesyncer' 18100 in phrase_these/phrase_related vs 22200 in tradesyncer.com resource_organic; 'tradecopia' 9900 vs 12100; 'trade copier' 1600 vs 1900). Recorded as returned; likely different data snapshots per database endpoint.",
+    "usetradelink.com: both domain_organic_organic and domain_rank returned 'ERROR 50 :: NOTHING FOUND' (code 'internal', retryable false) in the us database, i.e. Semrush has no organic ranking data for the domain. These are no-data responses, not quota/subscription errors.",
+    "phrase_related for 'futures trade copier' returned broad copy-trading terms, not futures-specific ones; several are noise (e.g. 'http track website copier', 'copy trading platforms architecture').",
+    "Budget: 7 execute_report calls, 92 data rows. Reported api_units summed across successful calls: 120+1850+1650+1650+200 = 5470. Error calls reported no usage.",
+    "No API key, purchase, or project/settings change was involved."
+  ]
+}

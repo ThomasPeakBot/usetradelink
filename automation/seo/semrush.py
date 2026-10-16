@@ -121,10 +121,10 @@ def enrich(database_url, session=None):
     with psycopg.connect(database_url, connect_timeout=10) as conn:
         # A single global database lock prevents concurrent cron runs spending twice.
         cur = conn.cursor()
+        cur.execute("SELECT pg_try_advisory_lock(915202610)")
+        if not cur.fetchone()[0]:
+            return {"status": "another_run_active", "requests": 0, "reserved_units": 0}
         try:
-            cur.execute("SELECT pg_try_advisory_lock(915202610)")
-            if not cur.fetchone()[0]:
-                return {"status": "another_run_active", "requests": 0, "reserved_units": 0}
             cur.execute(SQL)
             conn.commit()
             available = candidates(cur)
@@ -199,6 +199,9 @@ def enrich(database_url, session=None):
                     status = error_category
                     break
         finally:
+            # A failed statement aborts the transaction; roll back first so the
+            # unlock runs and the original error is not masked.
+            conn.rollback()
             cur.execute("SELECT pg_advisory_unlock(915202610)")
             conn.commit()
     return {"status": status, "requests": count, "failed": failed,

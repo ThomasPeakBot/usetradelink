@@ -5,7 +5,8 @@
 ## What it collects
 
 - Daily crawl of up to 100 same-domain URLs listed in https://usetradelink.com/sitemap.xml.
-- HTTP status, HTML title, meta description, canonical, H1 count, basic noindex detection and internal link count.
+- HTTP status, sitemap URLs that redirect, HTML title and meta description (missing or over 70/170 characters), exact canonical match (a missing or extra trailing slash is a mismatch), H1 count, noindex (meta or X-Robots-Tag) and internal link count.
+- A run whose Search Console call failed is stored with `status = 'partial'`.
 - Optional read-only Google Search Console page/query/day metrics for 28 finalized days, upserted into Postgres.
 - Append-only technical audit runs and page snapshots in Postgres.
 
@@ -24,7 +25,7 @@ For Google Search Console:
 
 Run locally in the automation/seo folder:
 - python -m pip install -r requirements.txt
-- python -m unittest discover -s tests
+- python -m unittest discover -s tests (set TEST_DATABASE_URL to a disposable Postgres to include the database and Semrush budget tests)
 - python main.py --dry-run
 
 The normal run requires DATABASE_URL. Without Search Console credentials it still collects page audits and logs gsc_status = not_configured. Missing credentials are not a claim that Google data was collected.
@@ -65,6 +66,8 @@ Semrush Standard API is a paid, API-unit-metered integration. This worker uses t
 5. `SEMRUSH_SEED_KEYWORDS` is optional CSV of TradeLink-related targets. Initial defaults: futures trade copier, tradovate trade copier, best futures trade copier, prop firm trade copier, cloud futures trade copier, tradovate multiple accounts. The collector adds Search Console queries with at least five recent impressions, limited to relevant futures/trade copier topics; obvious forex/crypto terms are excluded.
 6. To reduce spend, each keyword is fetched at most once per 28 days; the daily SEO crawl stays daily. All Semrush responses are stored as comparable keyword-level metrics in `seo_semrush_keyword_metrics`. The append-only usage log is `seo_semrush_api_usage`.
 7. Inspect the Railway run's JSON `semrush.status`, `semrush.requests`, `semrush.reserved_units`, and Postgres tables. Missing keys or an unsupported subscription produce an error/status without exposing credentials. If you hit an API eligibility or unit error, leave `SEMRUSH_ENABLED=false` while resolving access.
+
+**Contract check before enabling:** the request URL (`https://api.semrush.com/apis/v4/keywords/v1/metrics`), parameters and response shape in `semrush.py` have not been confirmed against Semrush's v4 reference from this repository (the v4 keyword reports are early access). Semrush documents v4 `cpc` in USD cents, which the parser divides by 100. Confirm the endpoint and the per-request unit cost with one manual request before raising the budget.
 
 **IMPORTANT:** API units are not dollar amounts. This default is a low-cost trial cap in units, not an authorization to buy a Semrush plan or units. We do not generate, publish, or automatically approve site changes from these metrics.
 

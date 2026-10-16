@@ -18,6 +18,8 @@ SITEMAP = SITE + "/sitemap.xml"
 GSC_PROPERTY = "sc-domain:usetradelink.com"
 TIMEOUT = 12
 MAX_PAGES = 100
+TITLE_MAX = 70
+DESCRIPTION_MAX = 170
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS seo_runs (
@@ -83,6 +85,10 @@ def normalized_url(value):
         path += "/"
     return urlunsplit((u.scheme.lower(), (u.hostname or "").lower(), path, "", ""))
 
+def canonical_target(base, href):
+    u = urlsplit(urljoin(base, href.strip()))
+    return urlunsplit((u.scheme.lower(), (u.hostname or "").lower(), u.path or "/", u.query, ""))
+
 def extract_sitemap(xml_text):
     root = ET.fromstring(xml_text)
     ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
@@ -102,6 +108,9 @@ def inspect_page(session, url, sitemap_urls):
     try:
         response = session.get(url, timeout=TIMEOUT, allow_redirects=True)
         result["http_status"] = response.status_code
+        if response.history:
+            # Sitemaps should list final URLs; a redirect wastes crawl budget and hides the target.
+            issues.append("sitemap_url_redirects")
         if response.status_code != 200:
             issues.append("http_non_200")
             return result
@@ -125,13 +134,18 @@ def inspect_page(session, url, sitemap_urls):
         result["internal_links"] = len(links)
         if not result["title"]:
             issues.append("missing_title")
+        elif len(result["title"]) > TITLE_MAX:
+            issues.append("title_too_long")
         if not result["meta_description"]:
             issues.append("missing_description")
+        elif len(result["meta_description"]) > DESCRIPTION_MAX:
+            issues.append("description_too_long")
         if doc.h1_count != 1:
             issues.append("h1_count_not_one")
         if not doc.canonical:
             issues.append("missing_canonical")
-        elif normalized_url(urljoin(url, doc.canonical)) != normalized_url(url):
+        elif canonical_target(url, doc.canonical) != canonical_target(url, url):
+            # Exact comparison: /guide and /guide/ are different URLs to search engines.
             issues.append("canonical_mismatch")
         if result["noindex"]:
             issues.append("noindex")
@@ -166,6 +180,9 @@ def read_gsc(session, service_account_json):
             break
     return rows
 
+def run_status(gsc_status):
+    return "partial" if gsc_status.startswith("error:") else "complete"
+
 def save_database(database_url, run_id, pages, gsc_rows, gsc_status):
     issue_count = sum(len(p["issues"]) for p in pages)
     with psycopg.connect(database_url, connect_timeout=10) as conn:
@@ -175,7 +192,7 @@ def save_database(database_url, run_id, pages, gsc_rows, gsc_status):
                 "INSERT INTO seo_runs(id,started_at,finished_at,page_count,issue_count,gsc_rows,gsc_status,status) "
                 "VALUES(%s,%s,%s,%s,%s,%s,%s,%s)",
                 (run_id, datetime.now(timezone.utc), datetime.now(timezone.utc),
-                 len(pages), issue_count, len(gsc_rows), gsc_status, "complete"))
+                 len(pages), issue_count, len(gsc_rows), gsc_status, run_status(gsc_status)))
             for p in pages:
                 cur.execute(
                     "INSERT INTO seo_pages(run_id,url,http_status,title,meta_description,canonical,h1_count,"

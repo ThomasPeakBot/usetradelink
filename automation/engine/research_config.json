@@ -1,0 +1,23 @@
+{
+  "_about": "Research scope. Seeds and competitors are inputs to real provider queries; the engine never fabricates metrics for them.",
+  "seeds": [
+    "futures trade copier", "tradovate trade copier", "prop firm trade copier",
+    "trade copier for prop firms", "copy trading futures", "tradovate group trade",
+    "apex trade copier", "topstep copy trading", "cloud trade copier",
+    "tradovate multiple accounts", "copy trades between prop firm accounts",
+    "trade copier", "tradesyncer alternative", "tradecopia alternative",
+    "tradesyncer vs tradecopia", "how to copy trade on tradovate"
+  ],
+  "related_seeds": ["futures trade copier", "tradovate trade copier"],
+  "question_seeds": ["trade copier", "tradovate copy trading"],
+  "competitors": [
+    {"domain": "tradesyncer.com", "name": "TradeSyncer", "brand": "tradesyncer",
+     "pages": ["https://tradesyncer.com/", "https://tradesyncer.com/pricing/"]},
+    {"domain": "tradecopia.com", "name": "Tradecopia", "brand": "tradecopia",
+     "pages": ["https://tradecopia.com/", "https://tradecopia.com/pricing"]},
+    {"domain": "replikanto.com", "name": "Replikanto", "brand": "replikanto",
+     "pages": ["https://replikanto.com/"]}
+  ],
+  "refresh_days": {"keyword_metrics": 28, "relations": 60, "competitor_rankings": 30, "competitor_pages": 7},
+  "limits": {"related": 20, "questions": 15, "competitor_keywords": 30, "competitor_pages_per_run": 10}
+}

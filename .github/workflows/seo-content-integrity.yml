@@ -1,0 +1,50 @@
+name: TradeLink SEO content integrity
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  seo-content-integrity:
+    name: seo-content-integrity
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate SEO pages and sitemap
+        run: |
+          python - <<'PY'
+          import os, glob, xml.etree.ElementTree as ET
+          from html.parser import HTMLParser
+          from urllib.parse import urlparse
+
+          class Doc(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.title_count = self.h1_count = self.canonical_count = 0
+              def handle_starttag(self, tag, attrs):
+                  a = dict(attrs)
+                  if tag == "title": self.title_count += 1
+                  if tag == "h1": self.h1_count += 1
+                  if tag == "link" and "canonical" in (a.get("rel") or "").split():
+                      self.canonical_count += 1
+
+          sitemap = ET.parse("sitemap.xml")
+          ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+          urls = [x.text for x in sitemap.findall("s:url/s:loc", ns)]
+          assert urls and len(urls) == len(set(urls)), "Missing/duplicate sitemap URLs"
+          for url in urls:
+              parsed = urlparse(url)
+              assert parsed.scheme == "https" and parsed.netloc == "usetradelink.com", url
+              page = parsed.path.strip("/")
+              file = (page + "/index.html" if page else "index.html")
+              assert os.path.isfile(file), file
+              doc = Doc()
+              doc.feed(open(file, encoding="utf-8").read())
+              assert doc.title_count == 1 and doc.h1_count == 1 and doc.canonical_count == 1, file
+          print(f"Validated {len(urls)} sitemap URLs, page title/H1/canonical")
+          PY
+      - name: Content safety guard (scripts, iframes, checkout links, canonicals)
+        run: python automation/approvals/content_guard.py .

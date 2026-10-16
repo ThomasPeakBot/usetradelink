@@ -1,0 +1,29 @@
+{
+  "_about": "TradeLink product facts that generated content may state. 'published' = stated consistently on usetradelink.com on the date given; 'disputed' or 'needs_confirmation' facts must not be used until the product owner confirms them. Update 'status' and 'verified_on' only from an owner decision or a primary source.",
+  "updated_on": "2026-10-16",
+  "facts": [
+    {"id": "price", "statement": "TradeLink costs $40/month on a single plan.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/#pricing", "patterns": ["\\$40"]},
+    {"id": "account_limit", "statement": "One plan covers up to 150 accounts.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/#pricing", "patterns": ["150 accounts", "150 futures accounts"]},
+    {"id": "connections", "statement": "Unlimited supported connections are included.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/#pricing", "patterns": ["unlimited supported connections", "unlimited (supported )?Tradovate"]},
+    {"id": "copy_groups", "statement": "Unlimited copy groups.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/#features", "patterns": ["unlimited copy groups"]},
+    {"id": "tradovate", "statement": "Futures accounts connect through a Tradovate login.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/tradovate-trade-copier/", "patterns": ["Tradovate"]},
+    {"id": "rithmic", "statement": "Rithmic is coming soon and is not live.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/#faq", "patterns": ["Rithmic"]},
+    {"id": "ninjatrader", "statement": "NinjaTrader accounts are supported.", "status": "disputed", "verified_on": null, "source": "https://usetradelink.com/#faq", "note": "Homepage FAQ says NinjaTrader is supported; every other page and llms.txt say Tradovate only. Owner decision pending (issue #10, H8).", "patterns": ["NinjaTrader"]},
+    {"id": "sizing", "statement": "Followers can copy 1:1, by multiplier or by fixed quantity.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/#features", "patterns": ["multiplier", "fixed quantity", "1:1"]},
+    {"id": "fill_based", "statement": "Follower orders are placed from the leader's fills; partial fills can copy as they happen.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/#features", "patterns": ["partial fills"]},
+    {"id": "server_side", "statement": "The copier runs server-side; the browser does not need to stay open.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/#faq", "patterns": ["server-side", "browser (does not|doesn't) need"]},
+    {"id": "risk_rules", "statement": "Risk rules such as daily loss and profit limits can pause, flatten or lock one follower or a whole group.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/", "patterns": ["daily loss", "flatten"]},
+    {"id": "ten_rules", "statement": "There are ten protection rules.", "status": "needs_confirmation", "verified_on": null, "source": "https://usetradelink.com/#features", "note": "Claimed in four places but the rules are never listed (issue #10, M16).", "patterns": ["ten protection rules", "10 protection rules"], "scope": "anywhere"},
+    {"id": "journal_csv", "statement": "Includes a trade journal with CSV export.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/#pricing", "patterns": ["CSV"]},
+    {"id": "switch_offer", "statement": "Traders switching from another futures copier get the first month free plus $20 after the first successful renewal, with proof of cancellation.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/#switch-promo", "patterns": ["first month free", "\\$20"]},
+    {"id": "no_trial", "statement": "There is no standard free trial.", "status": "published", "verified_on": "2026-10-16", "source": "https://usetradelink.com/llms.txt", "patterns": ["free trial"]}
+  ],
+  "forbidden_claims": [
+    "guaranteed fills or identical results across accounts",
+    "profits, returns or win rates",
+    "approval or endorsement by any prop firm or broker",
+    "compatibility with a broker, platform or prop firm not listed as published above",
+    "undetectable copying or avoiding prop firm rules",
+    "personal testing, user stories, quotes or reviews that do not exist"
+  ]
+}

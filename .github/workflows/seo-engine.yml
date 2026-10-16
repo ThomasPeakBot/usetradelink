@@ -1,0 +1,45 @@
+name: TradeLink SEO engine tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  engine-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Disposable CI database; tests drop and recreate the schema.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    defaults:
+      run:
+        working-directory: automation/engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - run: python -m compileall -q engine
+      - run: python -m unittest discover -s tests -v
+      - name: Engine never calls paid or publishing APIs by default
+        run: |
+          python - <<'PY'
+          import os
+          from engine import drafting, proposals
+          from engine.providers import semrush
+          assert os.getenv("ENGINE_SEMRUSH_ENABLED") is None and semrush.capped("ENGINE_SEMRUSH_MAX_UNITS_PER_RUN", 3000) == 0
+          assert drafting.draft_with_claude({}, []) == (None, "content_llm_disabled")
+          assert not proposals.enabled()
+          print("paid and publishing steps are off by default")
+          PY

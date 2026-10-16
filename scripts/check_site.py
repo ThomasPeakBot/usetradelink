@@ -125,10 +125,11 @@ class Page(HTMLParser):
 
 
 def tracked_files(root):
-    if not os.path.isdir(os.path.join(root, ".git")):
+    # .git is a directory in a clone and a file in a worktree.
+    if not os.path.exists(os.path.join(root, ".git")):
         files = []
         for dirpath, dirnames, filenames in os.walk(root):
-            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+            dirnames[:] = [d for d in dirnames if not d.startswith(".") and d != "_site"]
             files += [os.path.relpath(os.path.join(dirpath, f), root).replace(os.sep, "/")
                       for f in filenames]
         return files
@@ -139,7 +140,7 @@ def tracked_files(root):
     except (OSError, subprocess.CalledProcessError):
         files = []
         for dirpath, dirnames, filenames in os.walk(root):
-            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+            dirnames[:] = [d for d in dirnames if not d.startswith(".") and d != "_site"]
             files += [os.path.relpath(os.path.join(dirpath, f), root).replace(os.sep, "/")
                       for f in filenames]
         return files

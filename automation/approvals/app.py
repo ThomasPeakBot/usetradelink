@@ -3,6 +3,7 @@
 No publishing occurs unless the service is explicitly armed and a verified
 Slack approver approves an immutable GitHub PR SHA.
 """
+import base64
 import hashlib
 import hmac
 import json
@@ -175,7 +176,7 @@ def approval_blocks(proposal_id, number, sha, title, summary):
         {"type": "section", "text": {"type": "mrkdwn", "text":
             f"*{plain_slack(title[:140])}*\n"
             f"<https://github.com/{REPO}/pull/{number}|Review PR #{number}> • "
-            f"Commit: \`{sha[:12]}\`\n{plain_slack(summary[:1200])}"}},
+            f"Commit: `{sha[:12]}`\n{plain_slack(summary[:1200])}"}},
         {"type": "context", "elements": [{"type": "mrkdwn",
              "text": "Only this exact commit can be approved. Publication requires passing GitHub checks."}]},
         {"type": "actions", "elements": [
@@ -215,6 +216,11 @@ def startup():
             conn.execute(DDL)
         if armed():
             threading.Thread(target=publish_loop, daemon=True, name="seo-publisher").start()
+        if all(configured(x) for x in ("GITHUB_TOKEN", "SLACK_BOT_TOKEN",
+                                        "SLACK_CHANNEL_ID", "SLACK_SIGNING_SECRET",
+                                        "SLACK_APPROVER_IDS", "SLACK_TEAM_ID")):
+            threading.Thread(target=proposal_discovery_loop, daemon=True,
+                             name="seo-proposals").start()
         log.info("SEO approval service initialized; publishing_armed=%s", armed())
     except Exception:
         log.exception("Unable to initialize approval schema")
@@ -295,6 +301,10 @@ def update_status(proposal_id, old_states, new_state, actor, detail=""):
             p["status"] = new_state
             return p
 
+def notify_async(p, status):
+    # Acknowledge Slack within 3 seconds; do not await notification HTTP.
+    threading.Thread(target=inform, args=(p, status), daemon=True).start()
+
 def inform(p, status):
     channel = p.get("slack_channel") or os.getenv("SLACK_CHANNEL_ID", "")
     if channel:
@@ -337,14 +347,10 @@ async def interactions(request: Request):
                                  "errors": {"revision_block": "Enter 1–2500 characters."}})
         p = update_status(pid, ["pending"], "revision_requested", user, instruction)
         if p:
-            inform(p, "revisions requested by " + user)
+            notify_async(p, "revisions requested by " + user)
             if configured("GITHUB_TOKEN"):
-                try:
-                    github("POST", f"/repos/{REPO}/issues/{p['pr_number']}/comments",
-                           json={"body": "SEO revision requested (not approved to publish):\n\n" +
-                                instruction})
-                except Exception:
-                    log.exception("Could not post revision comment to GitHub")
+                threading.Thread(target=post_revision_comment,
+                                 args=(p["pr_number"], instruction), daemon=True).start()
         return JSONResponse({})
     if payload.get("type") != "block_actions":
         return JSONResponse({})
@@ -370,7 +376,7 @@ async def interactions(request: Request):
     if kind == "seo_reject":
         p = update_status(pid, ["pending", "approved_queued"], "rejected", user)
         if p:
-            inform(p, "rejected by " + user + "; no publication")
+            notify_async(p, "rejected by " + user + "; no publication")
         return JSONResponse({"response_type": "ephemeral",
                              "text": "Rejected; publication stopped." if p
                                      else "This proposal is no longer pending."})
@@ -380,11 +386,97 @@ async def interactions(request: Request):
                         "text": "Approval executor is not armed; nothing was published."})
         p = update_status(pid, ["pending"], "approved_queued", user)
         if p:
-            inform(p, "approved by " + user + "; validation queued")
+            notify_async(p, "approved by " + user + "; validation queued")
         return JSONResponse({"response_type": "ephemeral",
                              "text": "Approval recorded. Exact-commit checks are queued; publishing is not yet confirmed."
                                      if p else "This proposal is no longer pending."})
     return JSONResponse({})
+
+def post_revision_comment(number, notes):
+    try:
+        github("POST", f"/repos/{REPO}/issues/{number}/comments",
+               json={"body": "SEO revision requested (not approved to publish):\n\n" + notes})
+    except Exception:
+        log.exception("Could not post revision instructions to GitHub")
+
+def proposal_discovery_loop():
+    """Notify Slack about existing SEO-labelled PRs; safe without publication rights."""
+    while True:
+        try:
+            prs = github("GET", f"/repos/{REPO}/pulls?state=open&per_page=100")
+            for pr in prs:
+                labels = {x.get("name") for x in pr.get("labels", [])}
+                if ("seo-agent-proposal" not in labels or
+                        pr.get("base", {}).get("ref") != "main" or
+                        pr.get("head", {}).get("repo", {}).get("full_name") != REPO):
+                    continue
+                sha = pr.get("head", {}).get("sha", "")
+                if not SHA_PATTERN.fullmatch(sha):
+                    continue
+                with connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT id FROM seo_approval_proposals WHERE repo=%s "
+                                    "AND pr_number=%s AND commit_sha=%s",
+                                    (REPO, pr["number"], sha))
+                        exists = cur.fetchone()
+                if exists:
+                    continue
+                summary = (pr.get("body") or
+                    "SEO improvement proposed. Review the exact PR diff before approving.")[:1200]
+                pid = uuid.uuid4()
+                with connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("UPDATE seo_approval_proposals SET status='superseded',"
+                                    "updated_at=now() WHERE repo=%s AND pr_number=%s "
+                                    "AND commit_sha<>%s AND status='pending'",
+                                    (REPO, pr["number"], sha))
+                        cur.execute("INSERT INTO seo_approval_proposals("
+                                    "id,repo,pr_number,commit_sha,title,summary,status) "
+                                    "VALUES(%s,%s,%s,%s,%s,%s,'pending') "
+                                    "ON CONFLICT(repo,pr_number,commit_sha) DO NOTHING",
+                                    (pid, REPO, pr["number"], sha, pr["title"][:240], summary))
+                        if cur.rowcount == 0:
+                            continue
+                        record(cur, pid, "auto_discovered", "system", sha)
+                response = slack_request("chat.postMessage", {
+                    "channel": os.environ["SLACK_CHANNEL_ID"],
+                    "text": f"TradeLink SEO: PR #{pr['number']} awaits review",
+                    "blocks": approval_blocks(pid, pr["number"], sha, pr["title"], summary)})
+                with connection() as conn:
+                    conn.execute("UPDATE seo_approval_proposals SET slack_channel=%s,"
+                                 "slack_ts=%s WHERE id=%s",
+                                 (response["channel"], response["ts"], pid))
+        except Exception:
+            log.exception("SEO proposal discovery encountered an error")
+        time.sleep(120)
+
+def verify_live_content(paths, merge_sha, attempts=5, delay=15):
+    """Strong positive proof only: compare exact public bytes to merged GitHub files."""
+    expected = {}
+    for path in paths:
+        try:
+            obj = github("GET", f"/repos/{REPO}/contents/{path}?ref={merge_sha}")
+            expected[path] = base64.b64decode(obj["content"].replace("\\n", "").replace("\n", ""))
+        except Exception:
+            return False
+    for attempt in range(attempts):
+        try:
+            verified = True
+            for path, source in expected.items():
+                url = "https://usetradelink.com/" + (
+                    path[:-len("index.html")] if path.endswith("index.html") else path)
+                response = requests.get(url, timeout=12,
+                    headers={"User-Agent": "TradeLinkSEOPublisher/1.0"})
+                if response.status_code != 200 or response.content != source:
+                    verified = False
+                    break
+            if verified:
+                return True
+        except requests.RequestException:
+            pass
+        if attempt < attempts - 1:
+            time.sleep(delay)
+    return False
 
 def publish_once():
     with connection() as conn:
@@ -411,9 +503,14 @@ def publish_once():
                               "commit_title": "Approved SEO update: " + p["title"][:65]})
         if not result.get("merged"):
             raise ValueError("GitHub did not confirm merge")
-        detail = "github_merged:" + str(result.get("sha", ""))[:40]
-        status = "merged_verification_pending"
-        # Successful GitHub merge is NOT proof Cloudflare finished deploying.
+        merged_sha = str(result.get("sha", ""))
+        detail = "github_merged:" + merged_sha[:40]
+        if merged_sha and verify_live_content(paths, merged_sha):
+            status = "published_verified"
+            detail += ";live_content_hash_verified"
+        else:
+            status = "merged_verification_pending"
+        # Only exact production byte matches prove the deployed content matches this merge.
     except Exception as exc:
         detail = "blocked:" + exc.__class__.__name__ + ":" + str(exc)[:140]
         status = "needs_attention"

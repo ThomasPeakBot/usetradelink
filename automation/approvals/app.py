@@ -1,9 +1,9 @@
 """Approval-first TradeLink SEO Slack gateway.
 
-No publishing occurs unless the service is explicitly armed and a verified
-Slack approver approves an immutable GitHub PR SHA.
+No publishing occurs unless the service is explicitly armed, GitHub confirms
+at runtime that `main` is protected, and a verified Slack approver approves an
+immutable GitHub PR SHA.
 """
-import base64
 import hashlib
 import hmac
 import json
@@ -13,30 +13,37 @@ import re
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlsplit
 
 import psycopg
 import requests
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from psycopg.rows import dict_row
+
+from policy import ALLOWED_ROOTS, GITHUB_ALLOWED_CONTENT, allowed_path  # noqa: F401
 
 log = logging.getLogger("seo-approvals")
 logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="TradeLink SEO approval gateway", docs_url=None, redoc_url=None)
 REPO = "ThomasPeakBot/usetradelink"
 API_BASE = "https://api.github.com"
-GITHUB_ALLOWED_CONTENT = re.compile(
-    r"^(?:resources|compare|blog|blogs|guides|tradovate-[a-z0-9-]+|"
-    r"futures-[a-z0-9-]+|cloud-futures-[a-z0-9-]+|"
-    r"prop-firm-[a-z0-9-]+|apex-[a-z0-9-]+|best-futures-[a-z0-9-]+)/"
-    r"[a-z0-9/_-]*index\.html$"
-)
-ALLOWED_ROOTS = {"sitemap.xml", "llms.txt"}
+SITE = "https://usetradelink.com/"
 SHA_PATTERN = re.compile(r"^[a-f0-9]{40}$")
 GITHUB_CHECK = "seo-content-integrity"
+# Only a check run created by GitHub Actions counts; any installed app could
+# otherwise post a check run that merely carries the required name.
+GITHUB_CHECK_APP = "github-actions"
+PROPOSAL_LABEL = "seo-agent-proposal"
+SLACK_ACTIONS = {"seo_approve", "seo_reject", "seo_revise"}
+SLACK_VIEWS = {"seo_revision_modal"}
+OK_CONCLUSIONS = {"success", "neutral", "skipped"}
+STALE_JOB_MINUTES = 15
+PROTECTION_CACHE_SECONDS = 300
+MERGEABLE_ATTEMPTS = 4
+MERGEABLE_DELAY = 3
 DDL = """
 CREATE TABLE IF NOT EXISTS seo_approval_proposals (
   id uuid PRIMARY KEY, repo text NOT NULL, pr_number integer NOT NULL,
@@ -56,17 +63,22 @@ CREATE TABLE IF NOT EXISTS seo_approval_jobs (
   state text NOT NULL DEFAULT 'queued', created_at timestamptz NOT NULL DEFAULT now(),
   started_at timestamptz, finished_at timestamptz, result text
 );
+CREATE TABLE IF NOT EXISTS seo_slack_deliveries (
+  digest char(64) PRIMARY KEY, received_at timestamptz NOT NULL DEFAULT now()
+);
 """
 
 def configured(name):
     return bool(os.getenv(name, "").strip())
 
 def armed():
+    """Configuration gate only. GitHub-side protection is verified separately at execution."""
     return (os.getenv("PUBLISHING_ENABLED", "").lower() == "true"
             and os.getenv("BRANCH_PROTECTION_VERIFIED", "").lower() == "true"
             and all(configured(x) for x in
                     ("GITHUB_TOKEN", "SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET",
-                     "SLACK_APPROVER_IDS", "SLACK_TEAM_ID", "DATABASE_URL")))
+                     "SLACK_APPROVER_IDS", "SLACK_TEAM_ID", "SLACK_CHANNEL_ID",
+                     "DATABASE_URL")))
 
 def connection():
     return psycopg.connect(os.environ["DATABASE_URL"], connect_timeout=8, row_factory=dict_row)
@@ -90,19 +102,83 @@ def signed_request(body, timestamp, signature, secret, now=None):
                       hashlib.sha256).hexdigest()
     return hmac.compare_digest("v0=" + digest, signature)
 
-def allowed_path(path):
-    return path in ALLOWED_ROOTS or bool(GITHUB_ALLOWED_CONTENT.fullmatch(path))
+def claim_delivery(signature):
+    """Record a signed delivery once. A replay inside the 5-minute window is refused."""
+    digest = hashlib.sha256(signature.encode()).hexdigest()
+    with connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM seo_slack_deliveries WHERE received_at < now() - interval '1 day'")
+            cur.execute("INSERT INTO seo_slack_deliveries(digest) VALUES(%s) "
+                        "ON CONFLICT(digest) DO NOTHING", (digest,))
+            return cur.rowcount == 1
 
-def github(method, path, **kwargs):
+def github(method, path, raw=False, **kwargs):
     token = os.getenv("GITHUB_TOKEN", "")
-    headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+    headers = {"Accept": "application/vnd.github.raw" if raw else "application/vnd.github+json",
+               "X-GitHub-Api-Version": "2022-11-28"}
     if token:
         headers["Authorization"] = "Bearer " + token
     response = requests.request(method, API_BASE + path, headers=headers, timeout=15, **kwargs)
     if response.status_code >= 400:
         # Avoid leaking GitHub auth or response bodies into logs.
         raise RuntimeError("github_http_" + str(response.status_code))
-    return response.json()
+    return response.content if raw else response.json()
+
+_protection_cache = {"at": 0.0, "ok": False}
+
+def classic_protection_ok():
+    """Classic branch protection; reading it needs Administration: read on the token."""
+    try:
+        p = github("GET", f"/repos/{REPO}/branches/main/protection")
+    except RuntimeError:
+        return False
+    checks = p.get("required_status_checks") or {}
+    contexts = set(checks.get("contexts") or [])
+    contexts |= {c.get("context") for c in checks.get("checks") or []}
+    reviews = p.get("required_pull_request_reviews")
+    bypass = (reviews or {}).get("bypass_pull_request_allowances") or {}
+    return bool(GITHUB_CHECK in contexts
+                and reviews is not None
+                and not any(bypass.get(k) for k in ("users", "teams", "apps"))
+                and (p.get("enforce_admins") or {}).get("enabled") is True
+                and (p.get("allow_force_pushes") or {}).get("enabled") is False
+                and (p.get("allow_deletions") or {}).get("enabled") is False)
+
+def ruleset_protection_ok():
+    """Repository rulesets; the executor's own token must not be able to bypass them."""
+    try:
+        rules = github("GET", f"/repos/{REPO}/rules/branches/main")
+    except RuntimeError:
+        return False
+    if not isinstance(rules, list):
+        return False
+    types = {r.get("type") for r in rules}
+    contexts = {c.get("context")
+                for r in rules if r.get("type") == "required_status_checks"
+                for c in (r.get("parameters") or {}).get("required_status_checks") or []}
+    if not ({"pull_request", "non_fast_forward", "deletion"} <= types and GITHUB_CHECK in contexts):
+        return False
+    for ruleset_id in {r.get("ruleset_id") for r in rules if r.get("ruleset_id")}:
+        try:
+            ruleset = github("GET", f"/repos/{REPO}/rulesets/{ruleset_id}")
+        except RuntimeError:
+            return False
+        if ruleset.get("enforcement") != "active" or ruleset.get("current_user_can_bypass") != "never":
+            return False
+    return True
+
+def branch_protection_ok(now=None):
+    """Runtime proof from GitHub that main cannot be changed without the required check."""
+    now = time.time() if now is None else now
+    if now - _protection_cache["at"] < PROTECTION_CACHE_SECONDS:
+        return _protection_cache["ok"]
+    try:
+        ok = classic_protection_ok() or ruleset_protection_ok()
+    except Exception:
+        log.warning("Branch protection lookup failed; treating main as unprotected")
+        ok = False
+    _protection_cache.update(at=now, ok=ok)
+    return ok
 
 def pr_details(number):
     pr = github("GET", f"/repos/{REPO}/pulls/{number}")
@@ -115,6 +191,34 @@ def pr_details(number):
         raise ValueError("PR head SHA is invalid")
     return pr
 
+def fresh_pr(number, attempts=MERGEABLE_ATTEMPTS, delay=MERGEABLE_DELAY):
+    """GitHub computes `mergeable` lazily and returns null on the first read."""
+    pr = pr_details(number)
+    for _ in range(attempts - 1):
+        if pr.get("mergeable") is not None:
+            break
+        time.sleep(delay)
+        pr = pr_details(number)
+    return pr
+
+def verify_checks(sha):
+    checks = github("GET", f"/repos/{REPO}/commits/{sha}/check-runs?per_page=100")
+    runs = checks.get("check_runs", [])
+    if checks.get("total_count", len(runs)) > len(runs):
+        raise ValueError("Too many check runs to verify")
+    required = [c for c in runs if c.get("name") == GITHUB_CHECK
+                and (c.get("app") or {}).get("slug") == GITHUB_CHECK_APP]
+    if not required or any(c.get("conclusion") != "success" for c in required):
+        raise ValueError("Required seo-content-integrity check has not passed")
+    for c in runs:
+        if c.get("status") != "completed":
+            raise ValueError("A GitHub check is still running")
+        if c.get("conclusion") not in OK_CONCLUSIONS:
+            raise ValueError("A GitHub check failed")
+    status = github("GET", f"/repos/{REPO}/commits/{sha}/status")
+    if status.get("total_count", 0) and status.get("state") != "success":
+        raise ValueError("A commit status is pending or failed")
+
 def validate_publishable(pr, expected_sha):
     if not armed():
         raise ValueError("Publishing is not configured or authorized")
@@ -122,8 +226,12 @@ def validate_publishable(pr, expected_sha):
         raise ValueError("PR SHA changed after approval")
     if pr.get("draft"):
         raise ValueError("Draft PR must be marked ready for review")
+    if PROPOSAL_LABEL not in {x.get("name") for x in pr.get("labels") or []}:
+        raise ValueError("PR is missing the seo-agent-proposal label")
     if pr.get("mergeable") is not True:
         raise ValueError("PR must be confirmed mergeable")
+    if not branch_protection_ok():
+        raise ValueError("GitHub did not confirm protection rules on main")
     number = pr["number"]
     files = []
     page = 1
@@ -141,24 +249,17 @@ def validate_publishable(pr, expected_sha):
         if (item.get("status") in ("removed", "renamed") or
                 not allowed_path(item.get("filename", ""))):
             raise ValueError("Unapproved or high-risk file path")
-    checks = github("GET", f"/repos/{REPO}/commits/{expected_sha}/check-runs?per_page=100")
-    all_checks = checks.get("check_runs", [])
-    if not any(c.get("name") == GITHUB_CHECK and c.get("conclusion") == "success"
-               for c in all_checks):
-        raise ValueError("Required seo-content-integrity check has not passed")
-    if any(c.get("conclusion") in ("failure", "timed_out", "cancelled", "action_required")
-           for c in all_checks):
-        raise ValueError("A GitHub check failed")
+    verify_checks(expected_sha)
     return [f["filename"] for f in files]
 
-def slack_request(method, data):
+def slack_request(method, data, timeout=5):
     token = os.getenv("SLACK_BOT_TOKEN")
     if not token:
         raise RuntimeError("slack_not_configured")
     try:
         response = requests.post("https://slack.com/api/" + method, json=data,
                                  headers={"Authorization": "Bearer " + token},
-                                 timeout=5)
+                                 timeout=timeout)
         response.raise_for_status()
         payload = response.json()
         if not payload.get("ok"):
@@ -235,6 +336,37 @@ def health():
             "github_token_configured": configured("GITHUB_TOKEN"),
             "publishing_armed": armed()}
 
+def post_proposal(proposal_id, number, sha, title, summary):
+    result = slack_request("chat.postMessage", {
+        "channel": os.environ["SLACK_CHANNEL_ID"],
+        "text": f"TradeLink SEO: approval requested for PR #{number}",
+        "blocks": approval_blocks(proposal_id, number, sha, title, summary)})
+    with connection() as conn:
+        conn.execute("UPDATE seo_approval_proposals SET slack_channel=%s,slack_ts=%s,"
+                     "updated_at=now() WHERE id=%s",
+                     (result["channel"], result["ts"], proposal_id))
+
+def register_proposal(number, sha, title, summary, kind):
+    """Insert or find the proposal for an exact SHA; returns the row."""
+    with connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE seo_approval_proposals SET status='superseded',updated_at=now() "
+                "WHERE repo=%s AND pr_number=%s AND commit_sha<>%s AND status='pending'",
+                (REPO, number, sha))
+            cur.execute(
+                "INSERT INTO seo_approval_proposals(id,repo,pr_number,commit_sha,title,summary,status) "
+                "VALUES(%s,%s,%s,%s,%s,%s,'pending') "
+                "ON CONFLICT(repo,pr_number,commit_sha) DO NOTHING",
+                (uuid.uuid4(), REPO, number, sha, title, summary))
+            inserted = cur.rowcount == 1
+            cur.execute("SELECT * FROM seo_approval_proposals WHERE repo=%s AND pr_number=%s "
+                        "AND commit_sha=%s", (REPO, number, sha))
+            proposal = cur.fetchone()
+            if inserted:
+                record(cur, proposal["id"], kind, "system", sha)
+            return proposal
+
 @app.post("/internal/proposals")
 def propose(item: CreateProposal, authorization: str | None = Header(None)):
     require_internal(authorization)
@@ -243,41 +375,23 @@ def propose(item: CreateProposal, authorization: str | None = Header(None)):
     pr = pr_details(item.pr_number)
     sha = pr["head"]["sha"]
     title = pr.get("title", "SEO improvement")[:240]
-    with connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE seo_approval_proposals SET status='superseded',updated_at=now() "
-                "WHERE repo=%s AND pr_number=%s AND commit_sha<>%s AND status='pending'",
-                (REPO, item.pr_number, sha))
-            cur.execute(
-                "INSERT INTO seo_approval_proposals(id,repo,pr_number,commit_sha,title,summary,status) "
-                "VALUES(%s,%s,%s,%s,%s,%s,'pending') "
-                "ON CONFLICT(repo,pr_number,commit_sha) DO NOTHING",
-                (uuid.uuid4(), REPO, item.pr_number, sha, title, item.summary))
-            cur.execute("SELECT * FROM seo_approval_proposals WHERE repo=%s AND pr_number=%s "
-                        "AND commit_sha=%s", (REPO, item.pr_number, sha))
-            proposal = cur.fetchone()
-            if proposal["status"] != "pending":
-                raise HTTPException(status_code=409, detail="Existing proposal is not pending")
-            record(cur, proposal["id"], "proposal_registered", "system", sha)
+    proposal = register_proposal(item.pr_number, sha, title, item.summary, "proposal_registered")
+    if proposal["status"] != "pending":
+        raise HTTPException(status_code=409, detail="Existing proposal is not pending")
     if not proposal["slack_ts"]:
-        result = slack_request("chat.postMessage", {
-            "channel": os.environ["SLACK_CHANNEL_ID"],
-            "text": f"TradeLink SEO: approval requested for PR #{item.pr_number}",
-            "blocks": approval_blocks(proposal["id"], item.pr_number, sha,
-                                      title, item.summary)})
-        with connection() as conn:
-            conn.execute("UPDATE seo_approval_proposals SET slack_channel=%s,slack_ts=%s,"
-                         "updated_at=now() WHERE id=%s",
-                         (result["channel"], result["ts"], proposal["id"]))
+        post_proposal(proposal["id"], item.pr_number, sha, title, proposal["summary"])
     return {"proposal_id": str(proposal["id"]), "status": "pending",
             "pr_number": item.pr_number, "sha": sha, "published": False}
 
 def slack_authorized(payload):
-    user = payload.get("user", {}).get("id", "")
-    team = payload.get("team", {}).get("id", "")
+    user = (payload.get("user") or {}).get("id", "")
+    team = (payload.get("team") or {}).get("id", "")
     ids = {x.strip() for x in os.getenv("SLACK_APPROVER_IDS", "").split(",") if x.strip()}
     return bool(ids and user in ids and team == os.getenv("SLACK_TEAM_ID", "_"))
+
+def channel_allowed(payload):
+    expected = os.getenv("SLACK_CHANNEL_ID", "").strip()
+    return bool(expected) and (payload.get("channel") or {}).get("id") == expected
 
 def update_status(proposal_id, old_states, new_state, actor, detail=""):
     with connection() as conn:
@@ -301,9 +415,12 @@ def update_status(proposal_id, old_states, new_state, actor, detail=""):
             p["status"] = new_state
             return p
 
+def background(target, *args):
+    threading.Thread(target=target, args=args, daemon=True).start()
+
 def notify_async(p, status):
     # Acknowledge Slack within 3 seconds; do not await notification HTTP.
-    threading.Thread(target=inform, args=(p, status), daemon=True).start()
+    background(inform, p, status)
 
 def inform(p, status):
     channel = p.get("slack_channel") or os.getenv("SLACK_CHANNEL_ID", "")
@@ -316,80 +433,127 @@ def inform(p, status):
         except Exception:
             log.exception("Slack notification delivery failed")
 
+def respond(payload, text):
+    """Slack ignores the HTTP body of block_actions; feedback must go to response_url."""
+    url = payload.get("response_url") or ""
+    parts = urlsplit(url)
+    if parts.scheme != "https" or parts.hostname != "hooks.slack.com":
+        return
+    def send():
+        try:
+            requests.post(url, json={"response_type": "ephemeral", "replace_original": False,
+                                     "text": text}, timeout=5)
+        except requests.RequestException:
+            log.warning("Slack response_url delivery failed")
+    background(send)
+
 @app.post("/slack/interactions")
 async def interactions(request: Request):
     body = await request.body()
+    signature = request.headers.get("X-Slack-Signature")
     if not signed_request(body, request.headers.get("X-Slack-Request-Timestamp"),
-            request.headers.get("X-Slack-Signature"),
-            os.getenv("SLACK_SIGNING_SECRET", "")):
+            signature, os.getenv("SLACK_SIGNING_SECRET", "")):
         raise HTTPException(status_code=401, detail="Invalid Slack signature")
     try:
         raw = parse_qs(body.decode("utf-8"), strict_parsing=True)["payload"][0]
         payload = json.loads(raw)
+        if not isinstance(payload, dict):
+            raise ValueError("payload")
     except (KeyError, ValueError, UnicodeError, json.JSONDecodeError):
         raise HTTPException(status_code=400, detail="Malformed Slack interaction")
-    if not slack_authorized(payload):
-        return JSONResponse({"response_type": "ephemeral",
-                             "text": "You are not on the SEO approval allowlist."})
-    user = payload["user"]["id"]
-    if payload.get("type") == "view_submission":
-        view = payload.get("view", {})
-        if view.get("callback_id") != "seo_revision_modal":
+    # Database and Slack calls are blocking; keep them off the event loop.
+    return await run_in_threadpool(handle_interaction, payload, signature)
+
+def handle_interaction(payload, signature):
+    kind = payload.get("type")
+    if kind == "view_submission":
+        view = payload.get("view") or {}
+        if view.get("callback_id") not in SLACK_VIEWS:
             return JSONResponse({})
-        try:
-            pid = uuid.UUID(view["private_metadata"])
-            instruction = view["state"]["values"]["revision_block"]["notes"]["value"].strip()
-        except (KeyError, ValueError, TypeError):
-            return JSONResponse({"response_action": "errors",
-                                 "errors": {"revision_block": "Please describe the revisions."}})
-        if not instruction or len(instruction) > 2500:
-            return JSONResponse({"response_action": "errors",
-                                 "errors": {"revision_block": "Enter 1–2500 characters."}})
-        p = update_status(pid, ["pending"], "revision_requested", user, instruction)
-        if p:
-            notify_async(p, "revisions requested by " + user)
-            if configured("GITHUB_TOKEN"):
-                threading.Thread(target=post_revision_comment,
-                                 args=(p["pr_number"], instruction), daemon=True).start()
+    elif kind == "block_actions":
+        action = (payload.get("actions") or [{}])[0]
+        if action.get("action_id") not in SLACK_ACTIONS:
+            # The Slack app is shared: other subsystems' interactions are not ours to answer.
+            return JSONResponse({})
+    else:
         return JSONResponse({})
-    if payload.get("type") != "block_actions":
+    if not slack_authorized(payload):
+        if kind == "view_submission":
+            return JSONResponse({"response_action": "errors",
+                                 "errors": {"revision_block": "You are not on the SEO approval allowlist."}})
+        respond(payload, "You are not on the SEO approval allowlist.")
         return JSONResponse({})
-    action = (payload.get("actions") or [{}])[0]
+    if kind == "block_actions" and not channel_allowed(payload):
+        respond(payload, "SEO approvals are only accepted in the configured approvals channel.")
+        return JSONResponse({})
+    try:
+        fresh = claim_delivery(signature)
+    except Exception:
+        log.exception("Could not record Slack delivery")
+        raise HTTPException(status_code=503, detail="Approval storage unavailable")
+    if not fresh:
+        return JSONResponse({})
+    user = payload["user"]["id"]
+    if kind == "view_submission":
+        return handle_revision_submission(payload, user)
+    return handle_action(payload, action, user)
+
+def handle_revision_submission(payload, user):
+    view = payload.get("view") or {}
+    try:
+        pid = uuid.UUID(view["private_metadata"])
+        instruction = view["state"]["values"]["revision_block"]["notes"]["value"].strip()
+    except (KeyError, ValueError, TypeError, AttributeError):
+        return JSONResponse({"response_action": "errors",
+                             "errors": {"revision_block": "Please describe the revisions."}})
+    if not instruction or len(instruction) > 2500:
+        return JSONResponse({"response_action": "errors",
+                             "errors": {"revision_block": "Enter 1–2500 characters."}})
+    p = update_status(pid, ["pending"], "revision_requested", user, instruction)
+    if p:
+        notify_async(p, "revisions requested by " + user)
+        if configured("GITHUB_TOKEN"):
+            background(post_revision_comment, p["pr_number"], instruction)
+    return JSONResponse({})
+
+def handle_action(payload, action, user):
     kind = action.get("action_id")
     try:
         pid = uuid.UUID(action.get("value", ""))
-    except (ValueError, AttributeError):
-        return JSONResponse({"response_type": "ephemeral", "text": "Invalid proposal."})
+    except (ValueError, AttributeError, TypeError):
+        respond(payload, "Invalid proposal.")
+        return JSONResponse({})
     if kind == "seo_revise":
-        if not configured("SLACK_BOT_TOKEN"):
-            return JSONResponse({"response_type": "ephemeral", "text": "Slack is not configured."})
-        slack_request("views.open", {"trigger_id": payload.get("trigger_id"), "view": {
-            "type": "modal", "callback_id": "seo_revision_modal", "private_metadata": str(pid),
-            "title": {"type": "plain_text", "text": "Request SEO revisions"},
-            "submit": {"type": "plain_text", "text": "Request changes"},
-            "close": {"type": "plain_text", "text": "Cancel"},
-            "blocks": [{"type": "input", "block_id": "revision_block",
-                        "label": {"type": "plain_text", "text": "What should change?"},
-                        "element": {"type": "plain_text_input",
-                                    "action_id": "notes", "multiline": True}}]}})
+        try:
+            # trigger_id expires after 3 seconds, so this call cannot be deferred.
+            slack_request("views.open", {"trigger_id": payload.get("trigger_id"), "view": {
+                "type": "modal", "callback_id": "seo_revision_modal", "private_metadata": str(pid),
+                "title": {"type": "plain_text", "text": "Request SEO revisions"},
+                "submit": {"type": "plain_text", "text": "Request changes"},
+                "close": {"type": "plain_text", "text": "Cancel"},
+                "blocks": [{"type": "input", "block_id": "revision_block",
+                            "label": {"type": "plain_text", "text": "What should change?"},
+                            "element": {"type": "plain_text_input",
+                                        "action_id": "notes", "multiline": True}}]}},
+                timeout=2.5)
+        except RuntimeError:
+            respond(payload, "Could not open the revision form; nothing was changed.")
         return JSONResponse({})
     if kind == "seo_reject":
         p = update_status(pid, ["pending", "approved_queued"], "rejected", user)
         if p:
             notify_async(p, "rejected by " + user + "; no publication")
-        return JSONResponse({"response_type": "ephemeral",
-                             "text": "Rejected; publication stopped." if p
-                                     else "This proposal is no longer pending."})
-    if kind == "seo_approve":
-        if not armed():
-            return JSONResponse({"response_type": "ephemeral",
-                        "text": "Approval executor is not armed; nothing was published."})
-        p = update_status(pid, ["pending"], "approved_queued", user)
-        if p:
-            notify_async(p, "approved by " + user + "; validation queued")
-        return JSONResponse({"response_type": "ephemeral",
-                             "text": "Approval recorded. Exact-commit checks are queued; publishing is not yet confirmed."
-                                     if p else "This proposal is no longer pending."})
+        respond(payload, "Rejected; publication stopped." if p
+                else "This proposal is no longer pending.")
+        return JSONResponse({})
+    if not armed():
+        respond(payload, "Approval executor is not armed; nothing was published.")
+        return JSONResponse({})
+    p = update_status(pid, ["pending"], "approved_queued", user)
+    if p:
+        notify_async(p, "approved by " + user + "; validation queued")
+    respond(payload, "Approval recorded. Exact-commit checks are queued; publishing is not yet confirmed."
+            if p else "This proposal is no longer pending.")
     return JSONResponse({})
 
 def post_revision_comment(number, notes):
@@ -399,75 +563,67 @@ def post_revision_comment(number, notes):
     except Exception:
         log.exception("Could not post revision instructions to GitHub")
 
+def discover_once():
+    prs = github("GET", f"/repos/{REPO}/pulls?state=open&per_page=100")
+    for pr in prs:
+        labels = {x.get("name") for x in pr.get("labels", [])}
+        if (PROPOSAL_LABEL not in labels or
+                pr.get("base", {}).get("ref") != "main" or
+                pr.get("head", {}).get("repo", {}).get("full_name") != REPO):
+            continue
+        sha = pr.get("head", {}).get("sha", "")
+        if not SHA_PATTERN.fullmatch(sha):
+            continue
+        summary = (pr.get("body") or
+            "SEO improvement proposed. Review the exact PR diff before approving.")[:1200]
+        title = (pr.get("title") or "SEO improvement")[:240]
+        proposal = register_proposal(pr["number"], sha, title, summary, "auto_discovered")
+        # A failed Slack post leaves slack_ts empty and is retried on the next pass.
+        if proposal["status"] == "pending" and not proposal["slack_ts"]:
+            post_proposal(proposal["id"], pr["number"], sha, proposal["title"], proposal["summary"])
+
 def proposal_discovery_loop():
     """Notify Slack about existing SEO-labelled PRs; safe without publication rights."""
     while True:
         try:
-            prs = github("GET", f"/repos/{REPO}/pulls?state=open&per_page=100")
-            for pr in prs:
-                labels = {x.get("name") for x in pr.get("labels", [])}
-                if ("seo-agent-proposal" not in labels or
-                        pr.get("base", {}).get("ref") != "main" or
-                        pr.get("head", {}).get("repo", {}).get("full_name") != REPO):
-                    continue
-                sha = pr.get("head", {}).get("sha", "")
-                if not SHA_PATTERN.fullmatch(sha):
-                    continue
-                with connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("SELECT id FROM seo_approval_proposals WHERE repo=%s "
-                                    "AND pr_number=%s AND commit_sha=%s",
-                                    (REPO, pr["number"], sha))
-                        exists = cur.fetchone()
-                if exists:
-                    continue
-                summary = (pr.get("body") or
-                    "SEO improvement proposed. Review the exact PR diff before approving.")[:1200]
-                pid = uuid.uuid4()
-                with connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("UPDATE seo_approval_proposals SET status='superseded',"
-                                    "updated_at=now() WHERE repo=%s AND pr_number=%s "
-                                    "AND commit_sha<>%s AND status='pending'",
-                                    (REPO, pr["number"], sha))
-                        cur.execute("INSERT INTO seo_approval_proposals("
-                                    "id,repo,pr_number,commit_sha,title,summary,status) "
-                                    "VALUES(%s,%s,%s,%s,%s,%s,'pending') "
-                                    "ON CONFLICT(repo,pr_number,commit_sha) DO NOTHING",
-                                    (pid, REPO, pr["number"], sha, pr["title"][:240], summary))
-                        if cur.rowcount == 0:
-                            continue
-                        record(cur, pid, "auto_discovered", "system", sha)
-                response = slack_request("chat.postMessage", {
-                    "channel": os.environ["SLACK_CHANNEL_ID"],
-                    "text": f"TradeLink SEO: PR #{pr['number']} awaits review",
-                    "blocks": approval_blocks(pid, pr["number"], sha, pr["title"], summary)})
-                with connection() as conn:
-                    conn.execute("UPDATE seo_approval_proposals SET slack_channel=%s,"
-                                 "slack_ts=%s WHERE id=%s",
-                                 (response["channel"], response["ts"], pid))
+            discover_once()
         except Exception:
             log.exception("SEO proposal discovery encountered an error")
         time.sleep(120)
 
+def normalize_html(data):
+    """Remove differences a CDN may introduce (injected scripts, cf attributes, whitespace)."""
+    text = data.decode("utf-8", errors="replace")
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+    text = re.sub(r"<script\b[^>]*(?:cloudflare|/cdn-cgi/)[^>]*>.*?</script>", "", text,
+                  flags=re.S | re.I)
+    text = re.sub(r"\sdata-cf[a-z-]*=\"[^\"]*\"", "", text, flags=re.I)
+    text = re.sub(r">\s+<", "><", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+def live_url(path, merge_sha):
+    page = path[:-len("index.html")] if path.endswith("index.html") else path
+    return SITE + page + "?tl_verify=" + merge_sha[:12]
+
 def verify_live_content(paths, merge_sha, attempts=5, delay=15):
-    """Strong positive proof only: compare exact public bytes to merged GitHub files."""
+    """Positive proof only: public content must match the merged files after CDN normalisation."""
     expected = {}
     for path in paths:
         try:
-            obj = github("GET", f"/repos/{REPO}/contents/{path}?ref={merge_sha}")
-            expected[path] = base64.b64decode(obj["content"].replace("\\n", "").replace("\n", ""))
+            source = github("GET", f"/repos/{REPO}/contents/{path}?ref={merge_sha}", raw=True)
         except Exception:
             return False
+        expected[path] = normalize_html(source) if path.endswith(".html") else source
     for attempt in range(attempts):
         try:
             verified = True
             for path, source in expected.items():
-                url = "https://usetradelink.com/" + (
-                    path[:-len("index.html")] if path.endswith("index.html") else path)
-                response = requests.get(url, timeout=12,
-                    headers={"User-Agent": "TradeLinkSEOPublisher/1.0"})
-                if response.status_code != 200 or response.content != source:
+                response = requests.get(live_url(path, merge_sha), timeout=12,
+                    headers={"User-Agent": "TradeLinkSEOPublisher/1.0",
+                             "Cache-Control": "no-cache"})
+                body = (normalize_html(response.content) if path.endswith(".html")
+                        else response.content)
+                if response.status_code != 200 or body != source:
                     verified = False
                     break
             if verified:
@@ -477,6 +633,23 @@ def verify_live_content(paths, merge_sha, attempts=5, delay=15):
         if attempt < attempts - 1:
             time.sleep(delay)
     return False
+
+def reap_stale_jobs():
+    """A job left running (process crash mid-merge) needs a human; never retry it blindly."""
+    with connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT proposal_id FROM seo_approval_jobs WHERE state='running' "
+                        "AND started_at < now() - make_interval(mins => %s) "
+                        "FOR UPDATE SKIP LOCKED", (STALE_JOB_MINUTES,))
+            stale = [r["proposal_id"] for r in cur.fetchall()]
+            for pid in stale:
+                cur.execute("UPDATE seo_approval_jobs SET state='done',finished_at=now(),"
+                            "result='stale_running_job' WHERE proposal_id=%s", (pid,))
+                cur.execute("UPDATE seo_approval_proposals SET status='needs_attention',"
+                            "updated_at=now() WHERE id=%s", (pid,))
+                record(cur, pid, "needs_attention", "system",
+                       "Job exceeded running time; check GitHub before any retry")
+    return stale
 
 def publish_once():
     with connection() as conn:
@@ -496,7 +669,7 @@ def publish_once():
     try:
         if not armed():
             raise ValueError("Publishing flag or required credentials disabled")
-        pr = pr_details(p["pr_number"])
+        pr = fresh_pr(p["pr_number"])
         paths = validate_publishable(pr, p["commit_sha"])
         result = github("PUT", f"/repos/{REPO}/pulls/{p['pr_number']}/merge",
                         json={"sha": p["commit_sha"], "merge_method": "squash",
@@ -507,14 +680,12 @@ def publish_once():
         detail = "github_merged:" + merged_sha[:40]
         if merged_sha and verify_live_content(paths, merged_sha):
             status = "published_verified"
-            detail += ";live_content_hash_verified"
+            detail += ";live_content_verified"
         else:
             status = "merged_verification_pending"
-        # Only exact production byte matches prove the deployed content matches this merge.
     except Exception as exc:
         detail = "blocked:" + exc.__class__.__name__ + ":" + str(exc)[:140]
         status = "needs_attention"
-        paths = []
     with connection() as conn:
         with conn.cursor() as cur:
             cur.execute("UPDATE seo_approval_proposals SET status=%s,updated_at=now() "
@@ -529,6 +700,7 @@ def publish_once():
 def publish_loop():
     while True:
         try:
+            reap_stale_jobs()
             if armed():
                 publish_once()
         except Exception:
@@ -553,6 +725,12 @@ def opportunities(authorization: str | None = Header(None)):
     require_internal(authorization)
     with connection() as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('public.seo_search_performance') IS NOT NULL AS gsc, "
+                        "to_regclass('public.seo_semrush_keyword_metrics') IS NOT NULL AS semrush")
+            available = cur.fetchone()
+            if not available["gsc"]:
+                return {"source": "none", "candidates": [],
+                        "note": "Search Console data has not been collected yet; run seo-auditor first."}
             cur.execute("""
                 SELECT page,query,SUM(impressions)::int AS impressions,
                        SUM(clicks)::int AS clicks,
@@ -565,10 +743,8 @@ def opportunities(authorization: str | None = Header(None)):
                 ORDER BY impressions DESC LIMIT 100
             """)
             rows = cur.fetchall()
-            cur.execute("SELECT to_regclass('public.seo_semrush_keyword_metrics') IS NOT NULL AS available")
-            metrics_available = bool(cur.fetchone()["available"])
             latest = {}
-            if metrics_available:
+            if available["semrush"]:
                 cur.execute("""
                     SELECT DISTINCT ON (keyword) keyword,search_volume,
                         keyword_difficulty,cpc_usd,intents,collected_on

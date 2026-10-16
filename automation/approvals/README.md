@@ -6,7 +6,7 @@ The Phase 1 \`seo-auditor\` remains a separate, read-only Railway cron service.
 ## Architecture and actions
 - **Automatic discovery:** every 120 seconds the gateway checks GitHub for PRs targeting main with label `seo-agent-proposal`. It posts each new exact-SHA proposal to Slack once the Slack app and GitHub access are configured. New commits on a pending proposal supersede the old one; every new SHA requires a new decision.
 - POST /internal/proposals: an authenticated drafting agent can also register an existing GitHub PR directly and post its exact SHA, summary, review link and buttons.
-- POST /slack/interactions: verifies Slack request HMAC over raw bytes, rejects stale requests, checks workspace + approver allowlist.
+- POST /slack/interactions: verifies Slack request HMAC over raw bytes, rejects stale requests, stores a digest of each signature to refuse replays, checks workspace + approver allowlist and that button presses come from \`SLACK_CHANNEL_ID\`. Interactions whose action/callback IDs are not \`seo_*\` get an empty 200 so another subsystem sharing the Slack app is not answered with SEO errors. User feedback goes to Slack's \`response_url\` (Slack ignores the HTTP body of button presses).
 - Approve: records identity and exact SHA; queues asynchronous execution. It does NOT claim success before GitHub returns a successful merge.
 - Reject: marks the proposal rejected, cancels unstarted queued work.
 - Request changes: opens a Slack modal, stores the user's instructions, posts a GitHub PR comment and stops publication. The drafting agent must revise the PR and submit a **new** proposal at the new SHA.
@@ -15,14 +15,17 @@ The Phase 1 \`seo-auditor\` remains a separate, read-only Railway cron service.
 - GET /health: configuration health indicators only. No secrets or private operations.
 
 ## Permissions / fail-closed policy
-- Publish is OFF until \`PUBLISHING_ENABLED=true\` AND \`BRANCH_PROTECTION_VERIFIED=true\` AND all required credentials exist.
+- Publish is OFF until \`PUBLISHING_ENABLED=true\` AND \`BRANCH_PROTECTION_VERIFIED=true\` AND all required credentials exist (including \`SLACK_CHANNEL_ID\`).
+- \`BRANCH_PROTECTION_VERIFIED\` is only an operator acknowledgement. Before every merge the executor asks GitHub whether \`main\` is protected and refuses unless it can confirm either (a) classic protection with a required pull request, no bypass allowances, required \`seo-content-integrity\` status, enforced for admins, no force pushes or deletions (needs **Administration: read** on the token), or (b) an active ruleset with pull_request, required status check \`seo-content-integrity\`, non_fast_forward and deletion rules that the executor's own token cannot bypass (\`current_user_can_bypass = never\`). Any lookup failure keeps publishing blocked.
+- Only PRs carrying the \`seo-agent-proposal\` label can be published, and the required check must be created by GitHub Actions (a check run with the same name from another app is ignored). Every other check run and commit status on the SHA must be complete and passing.
 - Restrict SLACK_APPROVER_IDS and SLACK_TEAM_ID. A channel member who is not allowlisted cannot approve.
 - Approve only an exact PR commit SHA. If the PR changes, executor refuses it and a new proposal is required.
 - GitHub PR must be open, same repo, target main, non-draft, mergeable, with successful **seo-content-integrity** GitHub check and no failing check runs.
 - Only content HTML paths under selected SEO guide directories, sitemap.xml and llms.txt are eligible. No JS/CSS, checkout, brand assets, homepage, workflow files, automation code, file deletions or renames.
 - All other site changes must take the manual separate approval path until explicitly designed and tested.
 - Auto-merge is not enabled. The dedicated executor calls GitHub merge *after* the user's explicit approval.
-- Github merge is not proof Cloudflare has deployed. Service reports \`merged_verification_pending\` until production deployment can be independently confirmed.
+- Github merge is not proof Cloudflare has deployed. The executor fetches each merged file with a cache-busting query and compares it to the merged source after removing Cloudflare-injected scripts/attributes, comments and whitespace differences. Anything else reports \`merged_verification_pending\`.
+- The \`seo-content-integrity\` workflow also runs \`content_guard.py\`: allowlisted pages may only load \`/tracking.js\`, \`/seo.css\`, JSON-LD and the GTM noscript iframe; inline scripts, event handlers, forms, other iframes, meta refresh, javascript: URLs, noindex and any change to the checkout URL fail the check.
 - Hard requirement: enable GitHub branch protection on \`main\` before turning on publishing. Require pull requests and successful \`seo-content-integrity\`; limit bypass and direct pushes.
 - Do not create any Slack approval workflow with an unrestricted repository credential. Prefer a dedicated GitHub App installation token with only repo Content/Pull requests writes.
 
@@ -68,14 +71,14 @@ For a completely new Slack workspace *without* a reusable app, `slack-app-manife
 
 ## Worker
 The HTTP process starts a single lightweight job polling thread **only when armed**.
-Database transactions and FOR UPDATE SKIP LOCKED prevent simultaneous claims. A crash after a job claim leaves it in an attention-required state until manually reconciled (fail closed, not blind retry). Logs never show Slack/GitHub token values.
+Database transactions and FOR UPDATE SKIP LOCKED prevent simultaneous claims. A job still marked running after 15 minutes (for example a crash mid-merge) is moved to \`needs_attention\` and never retried automatically; check GitHub before re-approving. Logs never show Slack/GitHub token values.
 
 ## Current deployment state
 At construction time no Slack app credentials, GitHub publishing token, or Slack approver allowlist were provided. A live service can be deployed safely and respond to health checks but must remain unable to approve/publish until the Slack administrator connects it. This is a **deliberate** permission barrier, not a broken deployment.
 
 ## Local test
 \`python -m pip install -r requirements.txt\`
-\`python -m unittest discover -s tests -v\`
+\`python -m unittest discover -s tests -v\` (set \`TEST_DATABASE_URL\` to a disposable Postgres to include the database flow tests)
 \`uvicorn app:app --host 0.0.0.0 --port 8080\`
 
 ## Deployment URLs

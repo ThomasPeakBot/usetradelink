@@ -14,7 +14,8 @@ from helpers import DB, REPO, good_article
 
 SNAPSHOT = os.path.join(os.path.dirname(__file__), "fixtures", "semrush-snapshot-2026-10-16.json")
 SEMRUSH_ON = {"ENGINE_SEMRUSH_ENABLED": "true", "SEMRUSH_API_KEY": "secret-test-key",
-              "ENGINE_SEMRUSH_MAX_UNITS_PER_RUN": "400", "ENGINE_SEMRUSH_MAX_UNITS_PER_MONTH": "1000"}
+              "ENGINE_SEMRUSH_MAX_UNITS_PER_RUN": "400", "ENGINE_SEMRUSH_MAX_UNITS_PER_MONTH": "1000",
+              "ENGINE_SEMRUSH_MAX_UNITS_PER_CALL": "400"}
 
 
 class Resp:
@@ -52,7 +53,8 @@ class EngineDatabaseTests(unittest.TestCase):
 
     def test_migrations_are_idempotent(self):
         self.assertEqual(db.migrate(self.conn), [])
-        self.assertEqual(self.count("SELECT count(*) AS n FROM engine_schema_migrations"), 1)
+        self.assertEqual(self.count("SELECT count(*) AS n FROM engine_schema_migrations"),
+                         len(list(db.MIGRATIONS.glob("*.sql"))))
 
     def test_real_snapshot_import_builds_signals(self):
         counts = research.import_snapshot(self.conn, SNAPSHOT)
@@ -80,6 +82,8 @@ class EngineDatabaseTests(unittest.TestCase):
         self.assertTrue(any("budget" in s for s in summary["skipped"]))
         first = self.conn.execute("SELECT * FROM engine_api_usage ORDER BY id LIMIT 1").fetchone()
         self.assertEqual(first["units_reported"], 120)
+        # Paid-for results survive the run (they must not be bought again tomorrow).
+        self.assertGreater(self.count("SELECT count(*) AS n FROM seo_keyword_metrics"), 0)
         # The key is sent to Semrush but never stored or logged.
         self.assertNotIn("secret-test-key", json.dumps(
             [dict(r) for r in self.conn.execute("SELECT * FROM engine_api_usage")], default=str))
@@ -244,6 +248,68 @@ class EngineDatabaseTests(unittest.TestCase):
         self.assertIn(("PUT", "/repos/ThomasPeakBot/usetradelink/contents/guides/how-to-copy-trade-on-tradovate/index.html"), calls)
         self.assertIn(("POST", "/repos/ThomasPeakBot/usetradelink/issues/77/labels"), calls)
         self.assertEqual(self.count("SELECT count(*) AS n FROM engine_api_usage WHERE provider='anthropic'"), 1)
+
+
+@unittest.skipUnless(DB, "TEST_DATABASE_URL not set")
+class SpendingControlTests(unittest.TestCase):
+    def setUp(self):
+        with psycopg.connect(DB, autocommit=True) as conn:
+            conn.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
+        self.conn = db.connect(DB)
+        self.addCleanup(self.conn.close)
+        db.migrate(self.conn)
+
+    def client(self, session=None):
+        return semrush.Semrush(self.conn, session or FakeSemrushSession([]))
+
+    def test_every_cap_is_required(self):
+        for missing in ("ENGINE_SEMRUSH_MAX_UNITS_PER_RUN", "ENGINE_SEMRUSH_MAX_UNITS_PER_MONTH",
+                        "ENGINE_SEMRUSH_MAX_UNITS_PER_CALL"):
+            env = {k: v for k, v in SEMRUSH_ON.items() if k != missing}
+            with patch.dict(os.environ, env, clear=True):
+                self.assertFalse(self.client().enabled, missing)
+        with patch.dict(os.environ, SEMRUSH_ON, clear=True):
+            self.assertTrue(self.client().enabled)
+
+    @patch.dict(os.environ, dict(SEMRUSH_ON, SEMRUSH_KILL_SWITCH="true"), clear=True)
+    def test_kill_switch(self):
+        session = FakeSemrushSession([])
+        research.run_semrush(self.conn, research.load_config(), self.client(session))
+        self.assertEqual(session.calls, [])
+
+    @patch.dict(os.environ, SEMRUSH_ON, clear=True)
+    def test_operator_pause_and_resume(self):
+        run.spend(self.conn, pause_reason="budget review")
+        self.assertFalse(self.client().enabled)
+        status = run.spend(self.conn, resume=True)
+        self.assertFalse(status["paused"])
+        self.assertTrue(self.client().enabled)
+
+    @patch.dict(os.environ, dict(SEMRUSH_ON, ENGINE_SEMRUSH_MAX_UNITS_PER_CALL="90"), clear=True)
+    def test_expensive_report_refused_by_per_call_cap(self):
+        client = self.client()
+        self.assertEqual(client.affordable_lines("phrase_related", 20), 0)  # one related row costs 95
+        self.assertEqual(client.affordable_lines("phrase_these", 50), 9)
+
+    @patch.dict(os.environ, SEMRUSH_ON, clear=True)
+    def test_cost_above_estimate_pauses_all_spending(self):
+        body = "Keyword;Search Volume\r\nfutures trade copier;140\r\n"
+        # Balance drops by 900 units for a call estimated at 120.
+        session = FakeSemrushSession([body] * 5, balances=[5000, 4100])
+        summary = research.run_semrush(self.conn, research.load_config(), self.client(session))
+        self.assertIn("phrase_these:cost_exceeded_estimate", summary["errors"])
+        self.assertEqual(len([c for c in session.calls]), 1)
+        self.assertTrue(run.spend(self.conn)["paused"])
+        self.assertEqual(run.spend(self.conn)["month_units_used"], 900)
+
+    @patch.dict(os.environ, SEMRUSH_ON, clear=True)
+    def test_concurrent_semrush_runs_are_refused(self):
+        with psycopg.connect(DB) as holder:
+            holder.execute("SELECT pg_advisory_lock(915202610)")
+            session = FakeSemrushSession([])
+            summary = research.run_semrush(self.conn, research.load_config(), self.client(session))
+        self.assertIn("another_semrush_run_active", summary["skipped"])
+        self.assertEqual(session.calls, [])
 
 
 class ProposalGuardTests(unittest.TestCase):

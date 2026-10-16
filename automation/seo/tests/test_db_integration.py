@@ -33,12 +33,21 @@ class FakeResponse:
         return self.payload
 
 
+class FakeBalance:
+    def __init__(self, value):
+        self.status_code = 200 if value is not None else 500
+        self.text = str(value) if value is not None else ""
+
+
 class FakeSession:
     def __init__(self, responses):
         self.responses = list(responses)
         self.calls = []
 
     def get(self, url, params=None, headers=None, timeout=None):
+        if "countapiunits" in url:
+            balance = self.balances.pop(0) if getattr(self, "balances", None) else None
+            return FakeBalance(balance)
         self.calls.append(params["keyword"])
         return self.responses.pop(0) if self.responses else FakeResponse()
 
@@ -48,7 +57,8 @@ class CollectorDatabaseTests(unittest.TestCase):
     def setUp(self):
         with psycopg.connect(DB, autocommit=True) as conn:
             conn.execute("DROP TABLE IF EXISTS seo_pages, seo_runs, seo_search_performance, "
-                         "seo_semrush_api_usage, seo_semrush_keyword_metrics CASCADE")
+                         "seo_semrush_api_usage, seo_semrush_keyword_metrics, seo_spend_controls, "
+                         "engine_api_usage CASCADE")
         save_database(DB, uuid.uuid4(), [], [], "not_configured")
 
     def scalar(self, sql):
@@ -103,6 +113,51 @@ class CollectorDatabaseTests(unittest.TestCase):
                 self.assertEqual((result["status"], result["requests"]), (f"http_{code}", 1))
                 self.assertEqual(self.scalar(
                     "SELECT count(*) FROM seo_semrush_api_usage WHERE success = false"), 1)
+
+    @patch.dict(os.environ, {k: v for k, v in ON.items() if not k.startswith("SEMRUSH_MAX")}, clear=True)
+    def test_unset_caps_mean_no_spending(self):
+        session = FakeSession([])
+        self.assertEqual(semrush.enrich(DB, session)["status"], "budget_disabled")
+        self.assertEqual(session.calls, [])
+
+    @patch.dict(os.environ, dict(ON, SEMRUSH_KILL_SWITCH="true"), clear=True)
+    def test_kill_switch(self):
+        self.assertEqual(semrush.enrich(DB, FakeSession([]))["status"], "kill_switch")
+
+    @patch.dict(os.environ, ON, clear=True)
+    def test_operator_pause_shared_with_engine(self):
+        with psycopg.connect(DB) as conn:
+            conn.execute("CREATE TABLE seo_spend_controls(provider text PRIMARY KEY, paused boolean, "
+                         "reason text, updated_at timestamptz)")
+            conn.execute("INSERT INTO seo_spend_controls VALUES('semrush', true, 'review', now())")
+        session = FakeSession([])
+        self.assertEqual(semrush.enrich(DB, session)["status"], "paused")
+        self.assertEqual(session.calls, [])
+
+    @patch.dict(os.environ, ON, clear=True)
+    def test_engine_usage_counts_toward_the_monthly_cap(self):
+        with psycopg.connect(DB) as conn:
+            conn.execute("CREATE TABLE engine_api_usage(provider text, requested_at timestamptz DEFAULT now(), "
+                         "units_reserved int, units_reported int)")
+            conn.execute("INSERT INTO engine_api_usage(provider,units_reserved,units_reported) "
+                         "VALUES('semrush', 40, 70)")
+        session = FakeSession([])
+        result = semrush.enrich(DB, session)
+        # 100/month cap - 70 (engine, reported) leaves room for one 20-unit request.
+        self.assertEqual((result["status"], result["requests"]), ("monthly_budget_reached", 1))
+
+    @patch.dict(os.environ, ON, clear=True)
+    def test_cost_above_estimate_pauses(self):
+        with psycopg.connect(DB) as conn:
+            conn.execute("CREATE TABLE seo_spend_controls(provider text PRIMARY KEY, paused boolean, "
+                         "reason text, updated_at timestamptz)")
+        session = FakeSession([])
+        session.balances = [1000, 940]  # 60 units for a request estimated at 20
+        result = semrush.enrich(DB, session)
+        self.assertEqual((result["status"], result["requests"]), ("cost_exceeded_estimate", 1))
+        with psycopg.connect(DB) as conn:
+            self.assertTrue(conn.execute("SELECT paused FROM seo_spend_controls").fetchone()[0])
+            self.assertEqual(conn.execute("SELECT units_reported FROM seo_semrush_api_usage").fetchone()[0], 60)
 
     @patch.dict(os.environ, ON, clear=True)
     def test_bad_payload_is_recorded_not_stored(self):

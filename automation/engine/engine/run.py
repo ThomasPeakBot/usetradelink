@@ -205,6 +205,24 @@ def report(conn, limit=40):
     return "\n".join(lines)
 
 
+def spend(conn, pause_reason=None, resume=False):
+    """Semrush spending this month across the collector and the engine; optionally pause or resume."""
+    from .providers.semrush import Semrush
+    with conn.transaction():
+        if pause_reason:
+            conn.execute("INSERT INTO seo_spend_controls(provider,paused,reason,updated_at) VALUES('semrush',true,%s,now()) "
+                         "ON CONFLICT(provider) DO UPDATE SET paused=true,reason=EXCLUDED.reason,updated_at=now()",
+                         (pause_reason,))
+        if resume:
+            conn.execute("UPDATE seo_spend_controls SET paused=false,reason='resumed by operator',updated_at=now() "
+                         "WHERE provider='semrush'")
+    client = Semrush(conn, key="")
+    control = conn.execute("SELECT paused, reason, updated_at FROM seo_spend_controls WHERE provider='semrush'").fetchone()
+    return {"month_units_used": client.month_used(), "engine_caps": {"run": client.run_cap, "month": client.month_cap,
+            "call": client.call_cap}, "paused": bool(control and control["paused"]),
+            "reason": control["reason"] if control else "", "kill_switch": os.getenv("SEMRUSH_KILL_SWITCH", "") == "true"}
+
+
 def audit_content(site_dir):
     """Quality-gate every existing page against the others (no database needed)."""
     pages = inventory.from_directory(site_dir)
@@ -221,20 +239,28 @@ def audit_content(site_dir):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="engine.run")
-    parser.add_argument("command", nargs="?", default="cycle", choices=["cycle", "import-snapshot", "report", "audit-content"])
+    parser.add_argument("command", nargs="?", default="cycle", choices=["cycle", "migrate", "import-snapshot", "report", "audit-content", "spend"])
     parser.add_argument("path", nargs="?")
     parser.add_argument("--site-dir")
+    parser.add_argument("--pause", metavar="REASON", help="spend: pause all Semrush spending")
+    parser.add_argument("--resume", action="store_true", help="spend: resume Semrush spending")
     args = parser.parse_args(argv)
     if args.command == "audit-content":
         print(json.dumps(audit_content(args.site_dir or "."), indent=1))
         return 0
     with connect() as conn:
-        migrate(conn)
+        applied = migrate(conn)
+        if args.command == "migrate":
+            print(json.dumps({"applied": applied}))
+            return 0
         if args.command == "import-snapshot":
             print(json.dumps(research.import_snapshot(conn, args.path)))
             return 0
         if args.command == "report":
             print(report(conn))
+            return 0
+        if args.command == "spend":
+            print(json.dumps(spend(conn, pause_reason=args.pause, resume=args.resume), default=str))
             return 0
         run, status = cycle(conn, args.site_dir)
         print(json.dumps({"run_id": str(run.id), "status": status, "steps": run.steps, "errors": run.errors},

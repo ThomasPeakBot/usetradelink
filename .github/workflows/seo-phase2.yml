@@ -1,9 +1,8 @@
 name: TradeLink SEO Phase 2 approval tests
 on:
   pull_request:
-    paths:
-      - 'automation/approvals/**'
-      - '.github/workflows/seo-phase2.yml'
+  push:
+    branches: [main]
   workflow_dispatch:
 jobs:
   approval-gateway-tests:

@@ -1,11 +1,8 @@
 name: TradeLink SEO engine tests
 on:
   pull_request:
-    paths:
-      - 'automation/engine/**'
-      - 'automation/approvals/policy.py'
-      - 'automation/approvals/content_guard.py'
-      - '.github/workflows/seo-engine.yml'
+  push:
+    branches: [main]
   workflow_dispatch:
 jobs:
   engine-tests:

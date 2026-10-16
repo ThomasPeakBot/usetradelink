@@ -68,7 +68,7 @@ Optional flags, all off by default:
 
 | Flag | Default | Effect |
 |---|---|---|
-| `ENGINE_SEMRUSH_ENABLED=true` + `SEMRUSH_API_KEY` + `ENGINE_SEMRUSH_MAX_UNITS_PER_RUN` / `_PER_MONTH` | caps default to **0** | Hard ceilings 3,000/run and 10,000/month. The monthly cap also counts the collector's usage. Units are reserved before each call and actual units are read from Semrush's free balance endpoint. |
+| `ENGINE_SEMRUSH_ENABLED=true` + `SEMRUSH_API_KEY` + `ENGINE_SEMRUSH_MAX_UNITS_PER_RUN` / `_PER_MONTH` / `_PER_CALL` | all caps default to **0** | All three caps must be set. Hard ceilings: 3,000/run, 10,000/month, 500/call. A report whose worst-case cost exceeds the per-call cap is refused. The monthly cap counts the collector's usage too, using the larger of reserved and measured units. Units are reserved before each call and measured from Semrush's free balance endpoint. If a call costs more than its estimate, all Semrush spending is paused (`seo_spend_controls`). `SEMRUSH_KILL_SWITCH=true` stops everything; `python -m engine.run spend [--pause REASON|--resume]` shows or changes the pause. |
 | `ENGINE_COMPETITOR_CRAWL=true` | off | ≤10 competitor pages per run, 7-day refresh, robots.txt respected |
 | `CONTENT_LLM_ENABLED=true` + `ANTHROPIC_API_KEY` | off | Claude drafts new pages. Default model `claude-opus-5-5`, with server-side refusal fallback; usage is recorded in `engine_api_usage`. |
 | `ENGINE_PROPOSALS_ENABLED=true` + `ENGINE_GITHUB_TOKEN` | off | Opens labelled PRs (≤3 open). The token needs Contents + Pull requests write on this repo only; it cannot merge. |

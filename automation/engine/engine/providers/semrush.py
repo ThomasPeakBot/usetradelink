@@ -22,6 +22,7 @@ UNITS_PER_LINE = {"phrase_these": 10, "phrase_related": 95, "phrase_questions": 
                   "domain_organic": 70}
 HARD_RUN_CEILING = 3000
 HARD_MONTH_CEILING = 10000
+HARD_CALL_CEILING = 500
 COLUMNS = {
     "phrase_these": "Ph,Nq,Cp,Co,Nr,In,Kd",
     "phrase_related": "Ph,Nq,Cp,Co,Nr,Rr,In,Kd",
@@ -86,27 +87,47 @@ class Semrush:
         self.key = key if key is not None else os.getenv("SEMRUSH_API_KEY", "").strip()
         self.run_cap = capped("ENGINE_SEMRUSH_MAX_UNITS_PER_RUN", HARD_RUN_CEILING)
         self.month_cap = capped("ENGINE_SEMRUSH_MAX_UNITS_PER_MONTH", HARD_MONTH_CEILING)
+        # Largest single report the engine may buy; expensive reports beyond this are refused.
+        self.call_cap = capped("ENGINE_SEMRUSH_MAX_UNITS_PER_CALL", HARD_CALL_CEILING)
         self.reserved = 0
         self.stopped = None
 
     @property
     def enabled(self):
         return (os.getenv("ENGINE_SEMRUSH_ENABLED", "false").lower() == "true" and bool(self.key)
-                and self.run_cap > 0 and self.month_cap > 0)
+                and os.getenv("SEMRUSH_KILL_SWITCH", "").lower() != "true"
+                and self.run_cap > 0 and self.month_cap > 0 and self.call_cap > 0 and not self.paused())
+
+    def paused(self):
+        if not self.conn.execute("SELECT to_regclass('public.seo_spend_controls') IS NOT NULL AS ok").fetchone()["ok"]:
+            return False
+        row = self.conn.execute("SELECT paused FROM seo_spend_controls WHERE provider='semrush'").fetchone()
+        return bool(row and row["paused"])
+
+    def pause(self, reason):
+        with self.conn.transaction():
+            self.conn.execute("INSERT INTO seo_spend_controls(provider,paused,reason,updated_at) "
+                              "VALUES('semrush',true,%s,now()) ON CONFLICT(provider) DO UPDATE SET "
+                              "paused=true,reason=EXCLUDED.reason,updated_at=now()", (reason[:300],))
 
     def month_used(self):
         used = self.conn.execute(
-            "SELECT COALESCE(SUM(COALESCE(units_reported, units_reserved)),0) AS u FROM engine_api_usage "
-            "WHERE provider='semrush' AND requested_at >= date_trunc('month', now())").fetchone()["u"]
+            "SELECT COALESCE(SUM(GREATEST(units_reserved, COALESCE(units_reported, 0))),0) AS u "
+            "FROM engine_api_usage WHERE provider='semrush' AND requested_at >= date_trunc('month', now())"
+        ).fetchone()["u"]
         if self.conn.execute("SELECT to_regclass('public.seo_semrush_api_usage') IS NOT NULL AS ok").fetchone()["ok"]:
+            has_reported = self.conn.execute(
+                "SELECT 1 FROM information_schema.columns WHERE table_name='seo_semrush_api_usage' "
+                "AND column_name='units_reported'").fetchone()
+            expr = "GREATEST(units_reserved, COALESCE(units_reported, 0))" if has_reported else "units_reserved"
             used += self.conn.execute(
-                "SELECT COALESCE(SUM(units_reserved),0) AS u FROM seo_semrush_api_usage "
+                f"SELECT COALESCE(SUM({expr}),0) AS u FROM seo_semrush_api_usage "
                 "WHERE requested_at >= date_trunc('month', now())").fetchone()["u"]
         return int(used)
 
     def affordable_lines(self, report, wanted):
         per = UNITS_PER_LINE[report]
-        left = min(self.run_cap - self.reserved, self.month_cap - self.month_used())
+        left = min(self.run_cap - self.reserved, self.month_cap - self.month_used(), self.call_cap)
         return max(0, min(wanted, left // per))
 
     def balance(self):
@@ -164,6 +185,11 @@ class Semrush:
             self.conn.execute("UPDATE engine_api_usage SET success=%s,error_category=%s,units_reported=%s,"
                               "rows_returned=%s WHERE id=%s",
                               (success, error, reported, len(rows), usage_id))
+        if reported is not None and reported > reserve:
+            # Real cost above the worst-case estimate: stop and pause all Semrush spending.
+            self.pause(f"engine {report} cost {reported} units, estimate {reserve}")
+            self.stopped = "cost_exceeded_estimate"
+            raise SemrushError("cost_exceeded_estimate", True)
         if not success:
             raise SemrushError(error, bool(self.stopped))
         return rows

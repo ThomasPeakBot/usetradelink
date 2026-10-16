@@ -1,10 +1,8 @@
 name: TradeLink SEO Phase 1 checks
 on:
   pull_request:
-    paths:
-      - 'automation/seo/**'
-      - 'docs/tradelink-seo-automation-plan.md'
-      - '.github/workflows/seo-phase1.yml'
+  push:
+    branches: [main]
   workflow_dispatch:
 jobs:
   python-tests:
@@ -47,5 +45,19 @@ jobs:
               assert not any(x in text for x in forbidden), path
           print('No GitHub publishing API found')
           PY
+  live-site-crawl:
+    # Depends on the production site being reachable; informational, not a required check.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: automation/seo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
       - name: Live site crawl (read-only; no database writes)
         run: python main.py --dry-run

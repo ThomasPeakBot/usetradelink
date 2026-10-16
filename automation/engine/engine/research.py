@@ -7,10 +7,13 @@ import json
 from datetime import date
 from pathlib import Path
 
+import psycopg
+
 from .providers.semrush import (BudgetExceeded, Semrush, SemrushError, store_keyword_rows,
                                 store_rankings, store_relations)
 
 CONFIG = Path(__file__).resolve().parent.parent / "research_config.json"
+SEMRUSH_LOCK = 915202610  # shared with automation/seo/semrush.py
 
 
 def load_config(path=CONFIG):
@@ -52,6 +55,23 @@ def run_semrush(conn, config, client=None):
     if not client.enabled:
         summary["skipped"].append("disabled_or_no_budget")
         return summary
+    # Same advisory lock as the collector's Semrush step: never two spenders at once.
+    if not conn.execute("SELECT pg_try_advisory_lock(%s) AS ok", (SEMRUSH_LOCK,)).fetchone()["ok"]:
+        summary["skipped"].append("another_semrush_run_active")
+        return summary
+    try:
+        return _run_semrush(conn, config, client, summary)
+    finally:
+        # Keep everything already paid for (usage rows, stored metrics); only discard a failed transaction.
+        if conn.info.transaction_status == psycopg.pq.TransactionStatus.INERROR:
+            conn.rollback()
+        else:
+            conn.commit()
+        conn.execute("SELECT pg_advisory_unlock(%s)", (SEMRUSH_LOCK,))
+        conn.commit()
+
+
+def _run_semrush(conn, config, client, summary):
     days = config["refresh_days"]
     limits = config["limits"]
     from .keywords import relevance

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS seo_semrush_api_usage (
     success boolean,
     error_category text
 );
+ALTER TABLE seo_semrush_api_usage ADD COLUMN IF NOT EXISTS units_reported integer;
 CREATE TABLE IF NOT EXISTS seo_semrush_keyword_metrics (
     keyword text NOT NULL,
     country char(2) NOT NULL,
@@ -101,15 +102,69 @@ def parse_metrics(payload):
             "difficulty": kd, "cpc_usd": cents / 100 if cents is not None else None,
             "density": density, "intents": [str(v)[:30] for v in intents[:8]]}
 
+BALANCE_URL = "https://www.semrush.com/users/countapiunits.html"
+
+
+def spending_paused(cur):
+    """Kill switch (env) or an operator pause in seo_spend_controls (shared with the engine)."""
+    if os.getenv("SEMRUSH_KILL_SWITCH", "").lower() == "true":
+        return True
+    cur.execute("SELECT to_regclass('public.seo_spend_controls') IS NOT NULL")
+    if not cur.fetchone()[0]:
+        return False
+    cur.execute("SELECT paused FROM seo_spend_controls WHERE provider='semrush'")
+    row = cur.fetchone()
+    return bool(row and row[0])
+
+
+def pause_spending(cur, reason):
+    cur.execute("SELECT to_regclass('public.seo_spend_controls') IS NOT NULL")
+    if cur.fetchone()[0]:
+        cur.execute("INSERT INTO seo_spend_controls(provider,paused,reason,updated_at) "
+                    "VALUES('semrush',true,%s,now()) ON CONFLICT(provider) DO UPDATE SET "
+                    "paused=true,reason=EXCLUDED.reason,updated_at=now()", (reason[:300],))
+
+
+def month_units(cur):
+    """Units this calendar month across the collector AND the engine (one shared Semrush budget)."""
+    cur.execute("""
+        SELECT COALESCE(SUM(GREATEST(units_reserved, COALESCE(units_reported, 0))),0)
+        FROM seo_semrush_api_usage
+        WHERE requested_at >= date_trunc('month', now())
+          AND requested_at < date_trunc('month', now()) + interval '1 month'
+    """)
+    used = cur.fetchone()[0]
+    cur.execute("SELECT to_regclass('public.engine_api_usage') IS NOT NULL")
+    if cur.fetchone()[0]:
+        cur.execute("""SELECT COALESCE(SUM(GREATEST(units_reserved, COALESCE(units_reported, 0))),0)
+                       FROM engine_api_usage WHERE provider='semrush'
+                       AND requested_at >= date_trunc('month', now())""")
+        used += cur.fetchone()[0]
+    return int(used)
+
+
+def balance(session, api_key):
+    """Remaining API units from Semrush's free balance endpoint, or None."""
+    try:
+        r = session.get(BALANCE_URL, params={"key": api_key}, timeout=10)
+        text = (r.text or "").strip()
+        return int(text) if r.status_code == 200 and text.isdigit() else None
+    except (requests.RequestException, AttributeError, TypeError):
+        return None
+
+
 def enrich(database_url, session=None):
     """Return a summary; preserve audit data even if provider calls fail."""
     if os.getenv("SEMRUSH_ENABLED", "false").lower() != "true":
         return {"status": "disabled", "requests": 0, "reserved_units": 0}
+    if os.getenv("SEMRUSH_KILL_SWITCH", "").lower() == "true":
+        return {"status": "kill_switch", "requests": 0, "reserved_units": 0}
     api_key = os.getenv("SEMRUSH_API_KEY", "").strip()
     if not api_key:
         return {"status": "missing_key", "requests": 0, "reserved_units": 0}
-    run_cap = positive_limited("SEMRUSH_MAX_UNITS_PER_RUN", 120, 400)
-    month_cap = positive_limited("SEMRUSH_MAX_UNITS_PER_MONTH", 600, 2000)
+    # No implicit budget: both caps must be set explicitly (unset means zero, i.e. off).
+    run_cap = positive_limited("SEMRUSH_MAX_UNITS_PER_RUN", 0, 400)
+    month_cap = positive_limited("SEMRUSH_MAX_UNITS_PER_MONTH", 0, 2000)
     if run_cap < UNITS_PER_REQUEST or month_cap < UNITS_PER_REQUEST:
         return {"status": "budget_disabled", "requests": 0, "reserved_units": 0}
 
@@ -127,19 +182,15 @@ def enrich(database_url, session=None):
         try:
             cur.execute(SQL)
             conn.commit()
+            if spending_paused(cur):
+                return {"status": "paused", "requests": 0, "reserved_units": 0}
             available = candidates(cur)
             country = "US"
             for phrase in available:
                 if reserved + UNITS_PER_REQUEST > run_cap:
                     status = "run_budget_reached"
                     break
-                cur.execute("""
-                    SELECT COALESCE(SUM(units_reserved),0)
-                    FROM seo_semrush_api_usage
-                    WHERE requested_at >= date_trunc('month', now())
-                      AND requested_at < date_trunc('month', now()) + interval '1 month'
-                """)
-                used_month = cur.fetchone()[0]
+                used_month = month_units(cur)
                 if used_month + UNITS_PER_REQUEST > month_cap:
                     status = "monthly_budget_reached"
                     break
@@ -161,6 +212,7 @@ def enrich(database_url, session=None):
                 count += 1
                 error_category = None
                 success = False
+                before = balance(session, api_key)
                 try:
                     response = session.get(URL, params={"keyword": phrase, "country": country,
                                                          "format": "json"},
@@ -189,10 +241,19 @@ def enrich(database_url, session=None):
                     error_category = "response_error"
                 if not success:
                     failed += 1
+                after = balance(session, api_key) if before is not None else None
+                reported = before - after if after is not None and before >= after else None
                 cur.execute("""
                     UPDATE seo_semrush_api_usage
-                    SET success=%s,error_category=%s WHERE id=%s
-                """, (success, error_category, usage_id))
+                    SET success=%s,error_category=%s,units_reported=%s WHERE id=%s
+                """, (success, error_category, reported, usage_id))
+                if reported is not None and reported > UNITS_PER_REQUEST:
+                    # The real price exceeded the estimate: stop and pause all Semrush spending
+                    # until a person reviews the cost model.
+                    pause_spending(cur, f"collector call cost {reported} units, estimate {UNITS_PER_REQUEST}")
+                    conn.commit()
+                    status = "cost_exceeded_estimate"
+                    break
                 conn.commit()
                 # Stop on authentication/quota errors; no retry and no token output.
                 if error_category in ("http_401", "http_403", "http_402", "http_429"):

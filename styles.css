@@ -27,3 +27,9 @@ img,video{max-width:100%;height:auto;}
 @media (max-width:900px){#tradelink-lander .header-resources-toggle{padding:9px 12px;font-size:12px;}}
 @media (max-width:680px){#tradelink-lander .header-resources-toggle{padding:8px 10px;border-radius:10px;font-size:11px;width:auto;}}
 @media (max-width:390px){#tradelink-lander .header-resources-toggle{padding:7px 8px;font-size:10px;}#tradelink-lander .header-resources-menu{min-width:220px;}}
+
+/* Close excess space between hero and switch-promo; preserve visual content. */
+#tradelink-lander .hero{padding-bottom:36px;}
+#tradelink-lander .switch-promo{padding-top:18px;}
+@media (max-width:900px){#tradelink-lander .hero{padding-bottom:28px;}#tradelink-lander .switch-promo{padding-top:16px;}}
+@media (max-width:620px){#tradelink-lander .hero{padding-bottom:24px;}#tradelink-lander .switch-promo{padding-top:12px;}}

@@ -98,6 +98,20 @@ class OpportunityTests(unittest.TestCase):
         items = build({})
         self.assertEqual([o["target_url"] for o in by(items, "refresh_outdated")], [PROP])
 
+    def test_on_page_overlap_ignores_pages_narrowed_to_another_firm(self):
+        apex = "https://usetradelink.com/apex-tradovate-trade-copier/"
+        tv = page(TV, "Tradovate Trade Copier for Prop Accounts",
+                  headings=["How to copy trade on Tradovate with TradeLink"])
+        pages = [tv if p["url"] == TV else p for p in PAGES] + [
+            page(apex, "Apex Tradovate Trade Copier: Group Trade, Limits & Rules")]
+        items = opportunities.build({"how to copy trade on tradovate": sig(480, 18)}, pages,
+                                    ("tradesyncer", "tradecopia"), today=TODAY)
+        diff = by(items, "differentiate_pages")
+        self.assertEqual(len(diff), 1)
+        self.assertEqual(diff[0]["score"]["pages"][0], TV)  # the page with an answering section is the target
+        self.assertNotIn(apex, diff[0]["score"]["pages"])
+        self.assertIn(MULTI, diff[0]["score"]["pages"])
+
     def test_fingerprints_are_stable(self):
         a = build({"apex trade copier": sig(260, 12)})
         b = build({"apex trade copier": sig(300, 12)})

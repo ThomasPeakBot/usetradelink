@@ -188,8 +188,11 @@ def check(html, path, existing_texts, content_type="article", head_keyword="", f
     for fact in facts["facts"]:
         if fact["status"] == "published":
             continue
+        # Phrases only ever used for TradeLink (scope "anywhere") are caught even in a table cell
+        # that doesn't name it, e.g. the TradeLink column of a comparison table.
+        scope = clauses if fact.get("scope") == "anywhere" else about_us
         for pattern in fact.get("patterns", []):
-            hit = next((x for x in about_us if re.search(pattern, x, re.I)), None)
+            hit = next((x for x in scope if re.search(pattern, x, re.I)), None)
             if hit:
                 errors.append(f"uses {fact['status']} fact '{fact['id']}' in {hit[:90]!r}: "
                               f"{fact.get('note', fact['statement'])}")

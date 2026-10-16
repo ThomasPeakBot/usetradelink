@@ -69,6 +69,10 @@ class QualityGateTests(unittest.TestCase):
         self.assertTrue(ok["passed"], ok["errors"])
         r = check(good_article("<p>TradeLink has ten protection rules.</p>"))
         self.assertTrue(any("ten_rules" in e for e in r["errors"]))
+        # A TradeLink-only phrase is caught in a comparison-table cell that doesn't name TradeLink.
+        r = check(good_article("<table><tr><td>Risk rules</td><td>Ten protection rules, such as "
+                               "daily loss limits</td></tr></table>"))
+        self.assertTrue(any("ten_rules" in e for e in r["errors"]))
 
     def test_competitor_figures_need_inline_source_and_date(self):
         r = check(good_article("<p>TradeSyncer's Basic plan costs $49 per month.</p>"))

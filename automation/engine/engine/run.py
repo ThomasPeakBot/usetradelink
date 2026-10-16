@@ -196,7 +196,7 @@ def report(conn, limit=40):
     rows = conn.execute("SELECT action,content_type,target_url,head_keyword,priority,rationale,score,status "
                         "FROM seo_opportunities WHERE status IN ('open','briefed','drafted','proposed') "
                         "ORDER BY priority DESC LIMIT %s", (limit,)).fetchall()
-    lines = ["| Priority | Action | Keyword | Target | Volume | KD | Why |", "|---|---|---|---|---|---|---|"]
+    lines = ["| Priority | Action | Keyword | Target | Volume | Max KD in cluster | Why |", "|---|---|---|---|---|---|---|"]
     for r in rows:
         m = (r["score"] or {}).get("metrics", {})
         lines.append(f"| {r['priority']} | {r['action']}{' (' + r['content_type'] + ')' if r['content_type'] else ''} | "

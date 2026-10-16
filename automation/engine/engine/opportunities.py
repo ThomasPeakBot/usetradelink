@@ -13,6 +13,9 @@ from .keywords import cluster, content_type_for, intent, normalize, relevance, t
 HOME = "https://usetradelink.com/"
 # Words every page on this site shares; a page must also carry a query's other words to own it.
 GENERIC = {"trade", "copy", "futures", "account", "tradelink", "best", "how", "software", "tool"}
+# Firms and platforms that narrow a page's intent (an "Apex Tradovate" guide vs a general Tradovate one).
+QUALIFIERS = {"apex", "topstep", "tradeify", "lucid", "ninjatrader", "rithmic", "tradingview", "tradesyncer",
+              "tradecopia"}
 # Heuristic organic CTR by position, used only to flag unusually low CTR.
 EXPECTED_CTR = {1: .28, 2: .15, 3: .11, 4: .08, 5: .06, 6: .05, 7: .04, 8: .03, 9: .03, 10: .025}
 INTENT_WEIGHT = {"transactional": 1.0, "commercial": 1.0, "informational": 0.6, "navigational": 0.2}
@@ -280,18 +283,27 @@ def differentiate_overlaps(pages, signals, rel, weight, cfg):
     """Two of our pages strongly target the same head term: keyword cannibalisation risk."""
     out = []
     seen = set()
+    by_url = {p["url"]: p for p in pages}
     for kw in sorted((k for k in signals if rel.get(k, 0) >= cfg["min_relevance"]),
                      key=lambda k: -weight.get(k, 0)):
         if len(tokens(kw)) < 3:
             continue  # two-word heads like "copy trading" are the site's topic, not one page's intent
-        strong = sorted(p["url"] for p in pages if coverage(kw, p) >= 0.99 and p["url"] != HOME)
-        key = tuple(strong)
+        want = tokens(kw)
+        # A page whose title/H1 names a firm or platform the query doesn't (an Apex guide for a
+        # general Tradovate query) serves a narrower intent; it isn't competing for this query.
+        strong = sorted(p["url"] for p in pages if coverage(kw, p) >= 0.99 and p["url"] != HOME
+                        and not ((page_tokens(p)["title"] | page_tokens(p)["h1"]) & QUALIFIERS) - want)
+        # Point at the page with a section that answers the query, then the most focused title;
+        # the others get differentiated.
+        strong.sort(key=lambda u: (not any(want <= tokens(h) for h in by_url[u].get("headings") or []),
+                                   len(page_tokens(by_url[u])["title"] - want), u))
+        key = tuple(sorted(strong))
         # Matching most of the site means a shared topic word, not two pages competing.
         if 2 <= len(strong) <= max(2, len(pages) // 3) and key not in seen:
             seen.add(key)
             agg = aggregate([kw], signals)
             out.append({
-                "fingerprint": fingerprint("differentiate_pages", kw, "|".join(strong)),
+                "fingerprint": fingerprint("differentiate_pages", kw, "|".join(key)),
                 "action": "differentiate_pages", "content_type": None, "target_url": strong[0],
                 "head_keyword": kw, "keywords": [kw],
                 "priority": round(100 * demand_score(agg["volume"], agg["impressions"]) * 0.5 * 0.6, 1),

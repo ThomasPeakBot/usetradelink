@@ -4,7 +4,8 @@ This service is intentionally **disarmed until the user finishes Slack and GitHu
 The Phase 1 \`seo-auditor\` remains a separate, read-only Railway cron service.
 
 ## Architecture and actions
-- POST /internal/proposals: authenticated agent registers an existing GitHub PR and posts a Slack message containing its exact SHA, summary, review link and buttons.
+- **Automatic discovery:** every 120 seconds the gateway checks GitHub for PRs targeting main with label `seo-agent-proposal`. It posts each new exact-SHA proposal to Slack once the Slack app and GitHub access are configured. New commits on a pending proposal supersede the old one; every new SHA requires a new decision.
+- POST /internal/proposals: an authenticated drafting agent can also register an existing GitHub PR directly and post its exact SHA, summary, review link and buttons.
 - POST /slack/interactions: verifies Slack request HMAC over raw bytes, rejects stale requests, checks workspace + approver allowlist.
 - Approve: records identity and exact SHA; queues asynchronous execution. It does NOT claim success before GitHub returns a successful merge.
 - Reject: marks the proposal rejected, cancels unstarted queued work.
@@ -41,7 +42,7 @@ Required vars:
 - SLACK_CHANNEL_ID = C... (private channel sometimes G...)
 - SLACK_TEAM_ID = T...
 - SLACK_APPROVER_IDS = U123,U456 (comma-separated)
-- PROPOSAL_API_TOKEN = high-entropy private token for the drafting agent
+- PROPOSAL_API_TOKEN = high-entropy private token for the drafting agent (**already generated and stored privately in Railway during Phase 2 setup; do not regenerate casually**)
 - GITHUB_TOKEN = dedicated repo-scoped permission to read PRs and merge approved PRs
 - PUBLISHING_ENABLED = false (default)
 - BRANCH_PROTECTION_VERIFIED = false (default)
@@ -64,9 +65,15 @@ The HTTP process starts a single lightweight job polling thread **only when arme
 Database transactions and FOR UPDATE SKIP LOCKED prevent simultaneous claims. A crash after a job claim leaves it in an attention-required state until manually reconciled (fail closed, not blind retry). Logs never show Slack/GitHub token values.
 
 ## Current deployment state
-At construction time no Slack app credentials, GitHub publishing token, or allowlist were provided. A live service can be deployed safely and respond to health checks but must remain unable to approve/publish until the Slack administrator connects it. This is a **deliberate** permission barrier, not a broken deployment.
+At construction time no Slack app credentials, GitHub publishing token, or Slack approver allowlist were provided. A live service can be deployed safely and respond to health checks but must remain unable to approve/publish until the Slack administrator connects it. This is a **deliberate** permission barrier, not a broken deployment.
 
 ## Local test
 \`python -m pip install -r requirements.txt\`
 \`python -m unittest discover -s tests -v\`
 \`uvicorn app:app --host 0.0.0.0 --port 8080\`
+
+## Deployment URLs
+- Railway project: https://railway.com/project/ea11f4bd-6944-490a-a1c4-4c6a9cbfe131
+- Slack callback: https://seo-approvals-production.up.railway.app/slack/interactions
+- Health: https://seo-approvals-production.up.railway.app/health
+- App manifest: https://github.com/ThomasPeakBot/usetradelink/blob/seo/phase2-slack-approvals-20261016/automation/approvals/slack-app-manifest.yaml
